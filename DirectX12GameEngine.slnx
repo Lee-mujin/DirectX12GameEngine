@@ -1,0 +1,9 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="EngineModule/EngineModule.vcxproj" Id="92e4a432-3960-4b35-aba9-52b6aa349c11" />
+  <Project Path="GameEngine/GameEngine.vcxproj" Id="7f17717a-0e1b-4662-a88b-0a0acc547011" />
+  <Project Path="MathLib/MathLib.vcxproj" Id="bff058c3-6ce1-42a9-b92d-f7ef752f2fd6" />
+</Solution>

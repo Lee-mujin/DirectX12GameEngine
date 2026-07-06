@@ -1,0 +1,186 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="소스 파일">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="헤더 파일">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="리소스 파일">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Graphics">
+      <UniqueIdentifier>{e4118bce-7b9b-4c3d-bf03-4e27e211e42b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Cores">
+      <UniqueIdentifier>{a9b87d48-47bc-4c78-abb6-2c66b62ddb8a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{d095e1b7-79ff-4f05-8757-2e09ffbda2c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Cores\cpp">
+      <UniqueIdentifier>{4ac81fd4-2530-4076-ae7f-184af2dd902e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Cores\h">
+      <UniqueIdentifier>{6c6bebee-af04-4442-86f2-262a7fafbb21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\cpp">
+      <UniqueIdentifier>{dcd6f37a-ff5d-4de1-8743-3450a71113cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\h">
+      <UniqueIdentifier>{cdf5d09b-2270-41de-a4f1-6fb5694f3471}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene\cpp">
+      <UniqueIdentifier>{59f5656c-624e-431b-98c8-72c61aaad8e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene\h">
+      <UniqueIdentifier>{4b384df5-134a-4d36-b316-cf7e0a7241f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource">
+      <UniqueIdentifier>{861b54ca-a683-41cb-b4c6-9b375868b8a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource\cpp">
+      <UniqueIdentifier>{0c158161-31a9-42aa-bdc0-9d9c5edf9a40}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource\h">
+      <UniqueIdentifier>{5929548c-a686-4da8-8380-b1c675bd5364}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Application.h">
+      <Filter>Cores\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.h">
+      <Filter>Cores\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Timer.h">
+      <Filter>Cores\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Window.h">
+      <Filter>Cores\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="D3D12Renderer.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraComponent.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Component.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="RotatorComponent.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObject.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="LightComponent.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshRenderer.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneManager.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Vertex.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Material.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceManager.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectionalLight.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameResource.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="PointLight.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="SpotLight.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="EngineModule.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Application.cpp">
+      <Filter>Cores\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>Cores\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Timer.cpp">
+      <Filter>Cores\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Window.cpp">
+      <Filter>Cores\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="D3D12Renderer.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraComponent.cpp">
+      <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="RotatorComponent.cpp">
+      <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObject.cpp">
+      <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshRenderer.cpp">
+      <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneManager.cpp">
+      <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceManager.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Texture.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="FrameResource.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
