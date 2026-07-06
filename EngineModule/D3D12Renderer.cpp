@@ -6,6 +6,7 @@
 #include "FrameResource.h"
 #include "PointLight.h"
 #include "SpotLight.h"
+#include "ImGuiLayer.h"
 
 using namespace DirectX;
 
@@ -390,6 +391,11 @@ void D3D12Renderer::DrawMesh(const Mesh& mesh, const Material& material, const M
 
 void D3D12Renderer::EndFrame()
 {
+    if (mImGuiLayer) 
+    {
+        mImGuiLayer->Render(mCommandList.Get()); //ImGui 씬 위에 오버레이
+    }
+
     CD3DX12_RESOURCE_BARRIER barrierToPresent = CD3DX12_RESOURCE_BARRIER::Transition(
         mBackBuffers[mFrameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     mCommandList->ResourceBarrier(1, &barrierToPresent);

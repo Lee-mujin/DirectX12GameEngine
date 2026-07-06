@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Window.h"
 #include "Input.h"
+#include "imgui_impl_win32.h"
 
 bool Window::Create(HINSTANCE hInstance, int width, int height)
 {
@@ -78,8 +79,15 @@ void Window::Destroy()
     ::UnregisterClass(mClassName, mInstance);
 }
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam); 
+
 LRESULT CALLBACK Window::WndProc(HWND hWnd, UINT32 msg, WPARAM wParam, LPARAM lParam)
 {
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
+    {
+        return true;
+    }
+
     Window* window = reinterpret_cast<Window*>(::GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
     switch (msg)

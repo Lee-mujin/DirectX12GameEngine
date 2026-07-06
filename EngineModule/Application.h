@@ -5,6 +5,7 @@
 #include "D3D12Renderer.h"
 #include "SceneManager.h"
 #include "ResourceManager.h"
+#include "ImGuiLayer.h"
 
 class Application
 {
@@ -20,4 +21,5 @@ private:
     D3D12Renderer mRenderer;
     SceneManager mSceneManager;
     ResourceManager mResourceManager;
+    ImGuiLayer mImGuiLayer;
 };

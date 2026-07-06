@@ -14,6 +14,7 @@ class Mesh;
 class Material;
 class Camera;
 class Texture;
+class ImGuiLayer;
 struct Matrix4x4;
 struct DirectionalLight;
 struct PointLight;
@@ -29,10 +30,17 @@ public:
     void DrawMesh(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix);
     void EndFrame();
 
-    ID3D12Device* GetDevice() const { return mDevice.Get(); }
+    bool AllocateSrvSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu);
+    void SetImGuiLayer(ImGuiLayer* layer) { mImGuiLayer = layer; }
 
+public:
+    ID3D12Device* GetDevice() const { return mDevice.Get(); }
     std::shared_ptr<Texture> LoadTextureFromFile(const std::wstring& path);
     std::shared_ptr<Texture> CreateSolidColorTexture(BYTE r, BYTE g, BYTE b, BYTE a);
+    ID3D12CommandQueue* GetCommandQueue() const { return mCommandQueue.Get(); }
+    ID3D12DescriptorHeap* GetSrvHeap() const { return mSrvHeap.Get(); }
+    static constexpr UINT GetFrameCount() { return kFrameCount; }
+
 
 private:
     void CreateFactory();
@@ -52,7 +60,6 @@ private:
     void CreatePSO();
 
     void WaitForGpu(); // Cleanup에서만 사용 (전체 GPU 대기)
-    bool AllocateSrvSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu);
 
 private:
     static constexpr UINT kFrameCount = 2;
@@ -98,5 +105,8 @@ private:
     D3D12_RECT mScissorRect{};
 
     UINT mFrameIndex = 0;
+
+    ImGuiLayer* mImGuiLayer = nullptr;
+
     float mClearColor[4] = { 0.0f, 0.2f, 0.6f, 1.0f };
 };

@@ -3,7 +3,7 @@
 class Input
 {
 public:
-    void Update(); // 매 프레임 맨 앞에서 호출 (이전 상태 갱신)
+    void Update(); //매 프레임 맨 앞에서 호출
 
     void OnKeyDown(WPARAM key);
     void OnKeyUp(WPARAM key);
@@ -25,7 +25,7 @@ public:
 
 private:
     static constexpr int kKeyCount = 256;
-    static constexpr int kMouseButtonCount = 3; // 좌/우/중
+    static constexpr int kMouseButtonCount = 3; //좌우중
 
     bool mCurrKeys[kKeyCount] = {};
     bool mPrevKeys[kKeyCount] = {};
