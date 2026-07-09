@@ -4,6 +4,7 @@
 #include "PointLight.h"
 #include "SpotLight.h"
 #include "imgui.h"
+#include "SkinnedMesh.h"
 
 bool Application::Initialize(HINSTANCE hInstance)
 {
@@ -70,16 +71,26 @@ bool Application::Initialize(HINSTANCE hInstance)
     auto charObject = std::make_shared<GameObject>();
     charObject->SetName("Character");
     MeshRenderer* charRenderer = charObject->AddComponent<MeshRenderer>();
-    auto skinnedMesh = mResourceManager.LoadSkinnedModel("Textures/Cha.glb"); // ResourceManager에 LoadSkinnedModel 하나 추가 필요
+    auto skinnedMesh = mResourceManager.LoadSkinnedModel("Textures/Cha.glb");
     if (skinnedMesh)
     {
-
         charRenderer->SetMesh(skinnedMesh);
 
         auto material = std::make_shared<Material>();
         material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
         charRenderer->SetMaterial(material);
+
+        AnimatorComponent* animator = charObject->AddComponent<AnimatorComponent>();
+        animator->SetSkeleton(skinnedMesh->GetSkeleton());
+
+        auto animation = mResourceManager.LoadAnimation("Textures/Cha.glb", skinnedMesh->GetSkeleton());
+        if (animation)
+        {
+            animator->SetAnimation(animation);
+            animator->Play();
+        }
     }
+    charObject->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
     scene->AddGameObject(charObject);
 
     //DirectionalLight

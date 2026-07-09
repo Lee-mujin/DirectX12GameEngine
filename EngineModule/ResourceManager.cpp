@@ -4,6 +4,8 @@
 #include "D3D12Renderer.h"
 #include "ModelLoader.h"
 #include "SkinnedMesh.h"
+#include "Skeleton.h"
+#include "Animation.h"
 
 void ResourceManager::Initialize(D3D12Renderer* renderer)
 {
@@ -90,7 +92,12 @@ std::shared_ptr<Mesh> ResourceManager::LoadStaticModel(const std::string& path)
     return ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
 }
 
-std::shared_ptr<Mesh> ResourceManager::LoadSkinnedModel(const std::string& path)
+std::shared_ptr<SkinnedMesh> ResourceManager::LoadSkinnedModel(const std::string& path)
 {
-	return ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path);
+    return ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path);
+}
+
+std::shared_ptr<Animation> ResourceManager::LoadAnimation(const std::string& path, std::shared_ptr<Skeleton> skeleton)
+{
+    return ModelLoader::LoadAnimation(path, skeleton);
 }

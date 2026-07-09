@@ -6,6 +6,7 @@
 #include <d3dcompiler.h>
 #include <array>
 #include <memory>
+#include <vector>
 #include "FrameResource.h"
 
 using Microsoft::WRL::ComPtr;
@@ -33,7 +34,8 @@ public:
 
     bool AllocateSrvSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu);
     void SetImGuiLayer(ImGuiLayer* layer) { mImGuiLayer = layer; }
-    void DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix);
+    void DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
+
 public:
     ID3D12Device* GetDevice() const { return mDevice.Get(); }
     std::shared_ptr<Texture> LoadTextureFromFile(const std::wstring& path);

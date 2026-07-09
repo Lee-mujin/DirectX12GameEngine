@@ -435,7 +435,7 @@ void D3D12Renderer::DrawMesh(const Mesh& mesh, const Material& material, const M
     mObjectDrawIndex++;
 }
 
-void D3D12Renderer::DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix)
+void D3D12Renderer::DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices)
 {
     if (mObjectDrawIndex >= kMaxObjectsPerFrame) return;
 
@@ -455,11 +455,19 @@ void D3D12Renderer::DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& mat
     D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress = fr.objectCB->GetGPUVirtualAddress() + mObjectDrawIndex * fr.objectCBStride;
     mCommandList->SetGraphicsRootConstantBufferView(0, objectCBAddress);
 
-    // 1단계 검증: 본 행렬 전부 항등행렬 (bind pose 그대로 렌더링)
+    // 실제 애니메이션 본 팔레트 (없으면 항등행렬로 채움)
     BoneCBData boneData;
-    for (auto& m : boneData.BoneMatrices)
+    UINT boneCount = static_cast<UINT>(boneMatrices.size());
+    for (UINT i = 0; i < MAX_BONES; ++i)
     {
-        XMStoreFloat4x4(&m, XMMatrixIdentity());
+        if (i < boneCount)
+        {
+            XMStoreFloat4x4(&boneData.BoneMatrices[i], XMMatrixTranspose(ToXM(boneMatrices[i]))); //
+        }
+        else
+        {
+            XMStoreFloat4x4(&boneData.BoneMatrices[i], XMMatrixIdentity());
+        }
     }
 
     UINT8* boneDest = fr.boneCBMapped + mObjectDrawIndex * fr.boneCBStride;

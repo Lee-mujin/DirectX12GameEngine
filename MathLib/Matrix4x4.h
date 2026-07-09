@@ -22,7 +22,7 @@ public:
     static Matrix4x4 Rotate(const Quaternion& q);
     static Matrix4x4 Scale(const Vector3& v);
 
-    bool IsIdentity();
+    bool IsIdentity() const;
     float GetDeterminant() const;
     Matrix4x4 GetInverse() const;
     Matrix4x4 GetTranspose() const;
@@ -45,14 +45,14 @@ public:
     Matrix4x4& operator-=(const Matrix4x4& other);
     Matrix4x4& operator*=(const Matrix4x4& other);
 
-    Matrix4x4 operator*(float d);
-    Matrix4x4 operator/(float d);
-    Matrix4x4 operator+(const Matrix4x4& other);
-    Matrix4x4 operator-(const Matrix4x4& other);
-    Matrix4x4 operator*(const Matrix4x4& other);
+    Matrix4x4 operator*(float d) const;
+    Matrix4x4 operator/(float d) const;
+    Matrix4x4 operator+(const Matrix4x4& other) const;
+    Matrix4x4 operator-(const Matrix4x4& other) const;
+    Matrix4x4 operator*(const Matrix4x4& other) const;
 
-    bool operator==(const Matrix4x4& other);
-    bool operator!=(const Matrix4x4& other);
+    bool operator==(const Matrix4x4& other) const;
+    bool operator!=(const Matrix4x4& other) const;
 
     static const Matrix4x4 Identity;
     static const Matrix4x4 Zero;

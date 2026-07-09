@@ -98,7 +98,7 @@ Matrix4x4 Matrix4x4::Scale(const Vector3& v)
     return FromXM(XMMatrixScaling(v.X, v.Y, v.Z));
 }
 
-bool Matrix4x4::IsIdentity()
+bool Matrix4x4::IsIdentity() const
 {
     return *this == Identity;
 }
@@ -173,22 +173,22 @@ Matrix4x4& Matrix4x4::operator*=(const Matrix4x4& other)
     return *this;
 }
 
-Matrix4x4 Matrix4x4::operator*(float d) { Matrix4x4 result(*this); result *= d; return result; }
-Matrix4x4 Matrix4x4::operator/(float d) { Matrix4x4 result(*this); result /= d; return result; }
-Matrix4x4 Matrix4x4::operator+(const Matrix4x4& other) { Matrix4x4 result(*this); result += other; return result; }
-Matrix4x4 Matrix4x4::operator-(const Matrix4x4& other) { Matrix4x4 result(*this); result -= other; return result; }
+Matrix4x4 Matrix4x4::operator*(float d) const { Matrix4x4 result(*this); result *= d; return result; }
+Matrix4x4 Matrix4x4::operator/(float d) const { Matrix4x4 result(*this); result /= d; return result; }
+Matrix4x4 Matrix4x4::operator+(const Matrix4x4& other) const { Matrix4x4 result(*this); result += other; return result; }
+Matrix4x4 Matrix4x4::operator-(const Matrix4x4& other) const { Matrix4x4 result(*this); result -= other; return result; }
 
-Matrix4x4 Matrix4x4::operator*(const Matrix4x4& other)
+Matrix4x4 Matrix4x4::operator*(const Matrix4x4& other) const
 {
     return FromXM(XMMatrixMultiply(ToXM(*this), ToXM(other)));
 }
 
-bool Matrix4x4::operator==(const Matrix4x4& other)
+bool Matrix4x4::operator==(const Matrix4x4& other) const
 {
     return 0 == std::memcmp(this, &other, sizeof(Matrix4x4));
 }
 
-bool Matrix4x4::operator!=(const Matrix4x4& other)
+bool Matrix4x4::operator!=(const Matrix4x4& other) const
 {
     return 0 != std::memcmp(this, &other, sizeof(Matrix4x4));
 }

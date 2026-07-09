@@ -159,6 +159,12 @@
     <ClInclude Include="SkinnedMesh.h">
       <Filter>Resource\h</Filter>
     </ClInclude>
+    <ClInclude Include="Animation.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimatorComponent.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -253,6 +259,12 @@
     </ClCompile>
     <ClCompile Include="CgltfImpl.cpp">
       <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="AnimatorComponent.cpp">
+      <Filter>Scene\cpp</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -8,6 +8,7 @@ struct Bone
     std::string Name;
     int ParentIndex = -1; // 루트 본은 -1
     Matrix4x4 OffsetMatrix; // 바인드 포즈에서 모델 공간 -> 본 로컬 공간 변환
+    Matrix4x4 LocalBindTransform; // 애니메이션 채널 없는 본을 위한 기본 로컬 트랜스폼
 };
 
 class Skeleton

@@ -21,6 +21,7 @@
 #include "CameraComponent.h"
 #include "MeshRenderer.h"
 #include "RotatorComponent.h"
+#include "AnimatorComponent.h"
 #include "GameObject.h"
 
 using Microsoft::WRL::ComPtr;

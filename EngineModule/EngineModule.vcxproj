@@ -157,6 +157,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\GameEngine\ThirdParty\cgltf.h" />
+    <ClInclude Include="Animation.h" />
+    <ClInclude Include="AnimatorComponent.h" />
     <ClInclude Include="Application.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraComponent.h" />
@@ -213,6 +215,8 @@
     <ClCompile Include="..\GameEngine\ThirdParty\ImGui\imgui_widgets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Animation.cpp" />
+    <ClCompile Include="AnimatorComponent.cpp" />
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraComponent.cpp" />

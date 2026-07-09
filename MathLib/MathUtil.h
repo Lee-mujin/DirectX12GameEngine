@@ -40,7 +40,7 @@ struct Math
     template<class T>
     inline static constexpr T Lerp(const T& src, const T& dest, float alpha)
     {
-        return (T)(src + alpha * (dest - src));
+        return (T)(src + (dest - src) * alpha);   // 벡터 * 스칼라 순서로 변경
     }
 
     template<class T>

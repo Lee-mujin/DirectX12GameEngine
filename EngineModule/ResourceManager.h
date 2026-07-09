@@ -3,8 +3,11 @@
 #include <string>
 
 class Mesh;
+class SkinnedMesh;
 class Texture;
 class D3D12Renderer;
+class Skeleton;
+class Animation;
 
 class ResourceManager
 {
@@ -14,7 +17,8 @@ public:
     std::shared_ptr<Texture> LoadTexture(const std::wstring& path);
     std::shared_ptr<Texture> GetDefaultWhiteTexture();
     std::shared_ptr<Mesh> LoadStaticModel(const std::string& path);
-	std::shared_ptr<Mesh> LoadSkinnedModel(const std::string& path);
+	std::shared_ptr<SkinnedMesh> LoadSkinnedModel(const std::string& path);
+    std::shared_ptr<Animation> LoadAnimation(const std::string& path, std::shared_ptr<Skeleton> skeleton);
 private:
     D3D12Renderer* mRenderer = nullptr;
     std::shared_ptr<Mesh> mCubeMesh;
