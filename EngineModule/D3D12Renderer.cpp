@@ -7,6 +7,7 @@
 #include "PointLight.h"
 #include "SpotLight.h"
 #include "ImGuiLayer.h"
+#include "SkinnedMesh.h"
 
 using namespace DirectX;
 
@@ -44,6 +45,7 @@ bool D3D12Renderer::Initialize(HWND hwnd, UINT width, UINT height)
     CreateShader();
     CreateRootSignature();
     CreatePSO();
+    CreateSkinnedPSO();
 
     return true;
 }
@@ -228,6 +230,13 @@ void D3D12Renderer::CreateShader()
         if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
         ThrowIfFailed(hr);
     }
+    //스키닝 메시 컴파일 추가
+    hr = D3DCompileFromFile(L"Shaders/Default.hlsl", nullptr, nullptr, "VSMain_Skinned", "vs_5_0", compileFlags, 0, &mSkinnedVertexShader, &errorBlob);
+    if (FAILED(hr))
+    {
+        if (errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        ThrowIfFailed(hr);
+    }
 }
 
 void D3D12Renderer::CreateRootSignature()
@@ -235,11 +244,12 @@ void D3D12Renderer::CreateRootSignature()
     CD3DX12_DESCRIPTOR_RANGE srvRange;
     srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
-    CD3DX12_ROOT_PARAMETER rootParams[4];
+    CD3DX12_ROOT_PARAMETER rootParams[5];
     rootParams[0].InitAsConstantBufferView(0); // ObjectCB
     rootParams[1].InitAsConstantBufferView(1); // CameraCB
     rootParams[2].InitAsConstantBufferView(2); // LightCB
-    rootParams[3].InitAsDescriptorTable(1, &srvRange, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParams[3].InitAsConstantBufferView(3); // BoneCB
+    rootParams[4].InitAsDescriptorTable(1, &srvRange, D3D12_SHADER_VISIBILITY_PIXEL); // SRV, 인덱스
 
     D3D12_STATIC_SAMPLER_DESC sampler = {};
     sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -264,6 +274,8 @@ void D3D12Renderer::CreatePSO()
         { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BONEINDICES", 0, DXGI_FORMAT_R32G32B32A32_UINT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BONEWEIGHTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -284,6 +296,38 @@ void D3D12Renderer::CreatePSO()
     psoDesc.SampleDesc.Count = 1;
 
     ThrowIfFailed(mDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
+}
+
+void D3D12Renderer::CreateSkinnedPSO() //스키닝 메시용 PSO 생성 vs만교체
+{
+    D3D12_INPUT_ELEMENT_DESC inputLayout[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BONEINDICES", 0, DXGI_FORMAT_R32G32B32A32_UINT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BONEWEIGHTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout = { inputLayout, _countof(inputLayout) };
+    psoDesc.pRootSignature = mRootSignature.Get();
+    psoDesc.VS = { mSkinnedVertexShader->GetBufferPointer(), mSkinnedVertexShader->GetBufferSize() };
+    psoDesc.PS = { mPixelShader->GetBufferPointer(), mPixelShader->GetBufferSize() };
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState.DepthEnable = TRUE;
+    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    psoDesc.SampleDesc.Count = 1;
+
+    ThrowIfFailed(mDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mSkinnedPSO)));
 }
 
 void D3D12Renderer::BeginFrame(const Camera& camera, const DirectionalLight& dirLight, const PointLight& pointLight, const SpotLight& spotLight)
@@ -361,15 +405,17 @@ void D3D12Renderer::BeginFrame(const Camera& camera, const DirectionalLight& dir
 
 void D3D12Renderer::DrawMesh(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix)
 {
-    if (mObjectDrawIndex >= kMaxObjectsPerFrame)
-    {
-        return; // 이번 프레임 오브젝트 수 한도 초과 (필요하면 kMaxObjectsPerFrame 늘리기)
-    }
+    if (mObjectDrawIndex >= kMaxObjectsPerFrame) return;
+
+    mCommandList->SetPipelineState(mPSO.Get()); // 추가: 이전에 스키닝 그리기가 있었을 경우 대비
 
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
 
     ObjectCBData objData;
     XMStoreFloat4x4(&objData.World, XMMatrixTranspose(ToXM(worldMatrix)));
+    Vector3 matColor = material.GetColor();
+    objData.MaterialColor = XMFLOAT3(matColor.X, matColor.Y, matColor.Z);
+    objData.Shininess = material.GetShininess();
 
     UINT8* dest = fr.objectCBMapped + mObjectDrawIndex * fr.objectCBStride;
     memcpy(dest, &objData, sizeof(objData));
@@ -379,7 +425,52 @@ void D3D12Renderer::DrawMesh(const Mesh& mesh, const Material& material, const M
 
     if (auto texture = material.GetTexture())
     {
-        mCommandList->SetGraphicsRootDescriptorTable(3, texture->GetSrvHandle());
+        mCommandList->SetGraphicsRootDescriptorTable(4, texture->GetSrvHandle()); //4번수정
+    }
+
+    mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
+    mCommandList->IASetIndexBuffer(&mesh.GetIndexBufferView());
+    mCommandList->DrawIndexedInstanced(mesh.GetIndexCount(), 1, 0, 0, 0);
+
+    mObjectDrawIndex++;
+}
+
+void D3D12Renderer::DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix)
+{
+    if (mObjectDrawIndex >= kMaxObjectsPerFrame) return;
+
+    mCommandList->SetPipelineState(mSkinnedPSO.Get());
+
+    FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
+
+    ObjectCBData objData;
+    XMStoreFloat4x4(&objData.World, XMMatrixTranspose(ToXM(worldMatrix)));
+    Vector3 matColor = material.GetColor();
+    objData.MaterialColor = XMFLOAT3(matColor.X, matColor.Y, matColor.Z);
+    objData.Shininess = material.GetShininess();
+
+    UINT8* objDest = fr.objectCBMapped + mObjectDrawIndex * fr.objectCBStride;
+    memcpy(objDest, &objData, sizeof(objData));
+
+    D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress = fr.objectCB->GetGPUVirtualAddress() + mObjectDrawIndex * fr.objectCBStride;
+    mCommandList->SetGraphicsRootConstantBufferView(0, objectCBAddress);
+
+    // 1단계 검증: 본 행렬 전부 항등행렬 (bind pose 그대로 렌더링)
+    BoneCBData boneData;
+    for (auto& m : boneData.BoneMatrices)
+    {
+        XMStoreFloat4x4(&m, XMMatrixIdentity());
+    }
+
+    UINT8* boneDest = fr.boneCBMapped + mObjectDrawIndex * fr.boneCBStride;
+    memcpy(boneDest, &boneData, sizeof(boneData));
+
+    D3D12_GPU_VIRTUAL_ADDRESS boneCBAddress = fr.boneCB->GetGPUVirtualAddress() + mObjectDrawIndex * fr.boneCBStride;
+    mCommandList->SetGraphicsRootConstantBufferView(3, boneCBAddress);
+
+    if (auto texture = material.GetTexture())
+    {
+        mCommandList->SetGraphicsRootDescriptorTable(4, texture->GetSrvHandle());
     }
 
     mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());

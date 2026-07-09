@@ -33,6 +33,7 @@ bool Application::Initialize(HINSTANCE hInstance)
 
 	//GameObject에 CameraComponent를 추가해 카메라를 생성하고 Scene에 추가
     auto cameraObject = std::make_shared<GameObject>();
+    cameraObject->SetName("Camera");
     CameraComponent* cameraComponent = cameraObject->AddComponent<CameraComponent>();
     cameraComponent->Initialize(aspect);
     scene->AddGameObject(cameraObject);
@@ -40,6 +41,7 @@ bool Application::Initialize(HINSTANCE hInstance)
 
     //MeshRenderer 컴포넌트를 붙여서 큐브를 생성
     auto cube = std::make_shared<GameObject>();
+    cube->SetName("Cube");
     MeshRenderer* meshRenderer = cube->AddComponent<MeshRenderer>();
     meshRenderer->SetMesh(mResourceManager.GetCubeMesh());
     //머테리얼로 텍스처를 입힘
@@ -49,6 +51,36 @@ bool Application::Initialize(HINSTANCE hInstance)
     //회전추가
     cube->AddComponent<RotatorComponent>(90.0f);
     scene->AddGameObject(cube);
+
+    auto testObject = std::make_shared<GameObject>();
+    testObject->SetName("GltfTest");
+    MeshRenderer* gltfMeshRenderer = testObject->AddComponent<MeshRenderer>();
+
+    auto gltfMesh = mResourceManager.LoadStaticModel("Textures/Box.gltf");
+    if (gltfMesh)
+    {
+        gltfMeshRenderer->SetMesh(gltfMesh);
+
+        auto material = std::make_shared<Material>();
+        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
+        gltfMeshRenderer->SetMaterial(material);
+    }
+    scene->AddGameObject(testObject);
+
+    auto charObject = std::make_shared<GameObject>();
+    charObject->SetName("Character");
+    MeshRenderer* charRenderer = charObject->AddComponent<MeshRenderer>();
+    auto skinnedMesh = mResourceManager.LoadSkinnedModel("Textures/Cha.glb"); // ResourceManager에 LoadSkinnedModel 하나 추가 필요
+    if (skinnedMesh)
+    {
+
+        charRenderer->SetMesh(skinnedMesh);
+
+        auto material = std::make_shared<Material>();
+        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
+        charRenderer->SetMaterial(material);
+    }
+    scene->AddGameObject(charObject);
 
     //DirectionalLight
     scene->SetMainLight(DirectionalLight{ Vector3(0.3f, -0.8f, 0.5f), Vector3(1.0f, 1.0f, 1.0f), 1.0f });
@@ -87,7 +119,14 @@ void Application::Run()
         float deltaTime = mTimer.DeltaTime();
 
         mImGuiLayer.NewFrame();
-        ImGui::ShowDemoWindow(); //imgui뜨는지 확인
+
+        auto scene = mSceneManager.GetCurrentScene();
+        if (scene)
+        {
+            mHierarchy.Draw(*scene, mEditorState);
+            mLight.Draw(*scene);
+        }
+        mInspector.Draw(mEditorState);
 
         mSceneManager.Update(&mInput, deltaTime); //로직 업뎃
         mSceneManager.Render(mRenderer); //렌더러를 이용해 씬

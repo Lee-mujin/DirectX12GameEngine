@@ -8,6 +8,8 @@ using Microsoft::WRL::ComPtr;
 struct ObjectCBData
 {
     DirectX::XMFLOAT4X4 World;
+    DirectX::XMFLOAT3 MaterialColor;
+    float Shininess;
 };
 
 struct CameraCBData //카메라 위치
@@ -41,10 +43,17 @@ struct LightCBData
     DirectX::XMFLOAT3 SpotLightDirection;
     float SpotLightRange;
     DirectX::XMFLOAT3 SpotLightColor;
-    float SpotLightInnerCos; // cos(InnerConeAngle) 값을 CPU에서 미리 계산해서 넘김
-    float SpotLightOuterCos; // cos(OuterConeAngle)
+    float SpotLightInnerCos; //cos(InnerConeAngle) 값을 CPU에서 미리 계산해서 넘김
+    float SpotLightOuterCos; //cos(OuterConeAngle)
     int SpotLightEnabled;
     DirectX::XMFLOAT2 Pad2;
+};
+
+static constexpr UINT MAX_BONES = 96;
+
+struct BoneCBData //BoneCB 추가
+{
+    DirectX::XMFLOAT4X4 BoneMatrices[MAX_BONES];
 };
 
 class FrameResource
@@ -64,5 +73,9 @@ public:
     ComPtr<ID3D12Resource> lightCB;
     UINT8* lightCBMapped = nullptr;
 
-    UINT64 fenceValue = 0; // 이 FrameResource를 마지막으로 쓴 프레임의 fence 값
+    ComPtr<ID3D12Resource> boneCB;
+    UINT8* boneCBMapped = nullptr;
+    UINT boneCBStride = 0;
+
+    UINT64 fenceValue = 0; //이 FrameResource를 마지막으로 쓴 프레임의 fence 값
 };

@@ -2,6 +2,8 @@
 #include "ResourceManager.h"
 #include "Texture.h"
 #include "D3D12Renderer.h"
+#include "ModelLoader.h"
+#include "SkinnedMesh.h"
 
 void ResourceManager::Initialize(D3D12Renderer* renderer)
 {
@@ -17,37 +19,37 @@ std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
 
     std::vector<Vertex> vertices =
     {
-        // Front (-Z), normal (0,0,-1)
+        // Front -Z, normal (0,0,-1)
         { { -0.5f, -0.5f, -0.5f }, { 0,0,-1 }, {1,1,1,1}, {0.0f,1.0f} },
         { { -0.5f,  0.5f, -0.5f }, { 0,0,-1 }, {1,1,1,1}, {0.0f,0.0f} },
         { {  0.5f,  0.5f, -0.5f }, { 0,0,-1 }, {1,1,1,1}, {1.0f,0.0f} },
         { {  0.5f, -0.5f, -0.5f }, { 0,0,-1 }, {1,1,1,1}, {1.0f,1.0f} },
 
-        // Back (+Z), normal (0,0,1)
+        // Back +Z, normal (0,0,1)
         { {  0.5f, -0.5f,  0.5f }, { 0,0,1 }, {1,1,1,1}, {0.0f,1.0f} },
         { {  0.5f,  0.5f,  0.5f }, { 0,0,1 }, {1,1,1,1}, {0.0f,0.0f} },
         { { -0.5f,  0.5f,  0.5f }, { 0,0,1 }, {1,1,1,1}, {1.0f,0.0f} },
         { { -0.5f, -0.5f,  0.5f }, { 0,0,1 }, {1,1,1,1}, {1.0f,1.0f} },
 
-        // Left (-X), normal (-1,0,0)
+        // Left -X, normal (-1,0,0)
         { { -0.5f, -0.5f,  0.5f }, { -1,0,0 }, {1,1,1,1}, {0.0f,1.0f} },
         { { -0.5f,  0.5f,  0.5f }, { -1,0,0 }, {1,1,1,1}, {0.0f,0.0f} },
         { { -0.5f,  0.5f, -0.5f }, { -1,0,0 }, {1,1,1,1}, {1.0f,0.0f} },
         { { -0.5f, -0.5f, -0.5f }, { -1,0,0 }, {1,1,1,1}, {1.0f,1.0f} },
 
-        // Right (+X), normal (1,0,0)
+        // Right +X, normal (1,0,0)
         { {  0.5f, -0.5f, -0.5f }, { 1,0,0 }, {1,1,1,1}, {0.0f,1.0f} },
         { {  0.5f,  0.5f, -0.5f }, { 1,0,0 }, {1,1,1,1}, {0.0f,0.0f} },
         { {  0.5f,  0.5f,  0.5f }, { 1,0,0 }, {1,1,1,1}, {1.0f,0.0f} },
         { {  0.5f, -0.5f,  0.5f }, { 1,0,0 }, {1,1,1,1}, {1.0f,1.0f} },
 
-        // Top (+Y), normal (0,1,0)
+        // Top +Y, normal (0,1,0)
         { { -0.5f,  0.5f, -0.5f }, { 0,1,0 }, {1,1,1,1}, {0.0f,1.0f} },
         { { -0.5f,  0.5f,  0.5f }, { 0,1,0 }, {1,1,1,1}, {0.0f,0.0f} },
         { {  0.5f,  0.5f,  0.5f }, { 0,1,0 }, {1,1,1,1}, {1.0f,0.0f} },
         { {  0.5f,  0.5f, -0.5f }, { 0,1,0 }, {1,1,1,1}, {1.0f,1.0f} },
 
-        // Bottom (-Y), normal (0,-1,0)
+        // Bottom -Y, normal (0,-1,0)
         { { -0.5f, -0.5f,  0.5f }, { 0,-1,0 }, {1,1,1,1}, {0.0f,1.0f} },
         { { -0.5f, -0.5f, -0.5f }, { 0,-1,0 }, {1,1,1,1}, {0.0f,0.0f} },
         { {  0.5f, -0.5f, -0.5f }, { 0,-1,0 }, {1,1,1,1}, {1.0f,0.0f} },
@@ -56,12 +58,12 @@ std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
 
     std::vector<UINT16> indices =
     {
-        0, 1, 2,  0, 2, 3,       // Front
-        4, 5, 6,  4, 6, 7,       // Back
-        8, 9, 10, 8, 10, 11,     // Left
-        12,13,14, 12,14,15,      // Right
-        16,17,18, 16,18,19,      // Top
-        20,21,22, 20,22,23,      // Bottom
+        0, 1, 2,  0, 2, 3, //Front
+        4, 5, 6,  4, 6, 7, //Back
+        8, 9, 10, 8, 10, 11, //Left
+        12,13,14, 12,14,15, //Right
+        16,17,18, 16,18,19, //Top
+        20,21,22, 20,22,23, //Bottom
     };
 
     mCubeMesh = std::make_shared<Mesh>();
@@ -81,4 +83,14 @@ std::shared_ptr<Texture> ResourceManager::GetDefaultWhiteTexture()
         mDefaultWhiteTexture = mRenderer->CreateSolidColorTexture(255, 255, 255, 255);
     }
     return mDefaultWhiteTexture;
+}
+
+std::shared_ptr<Mesh> ResourceManager::LoadStaticModel(const std::string& path)
+{
+    return ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
+}
+
+std::shared_ptr<Mesh> ResourceManager::LoadSkinnedModel(const std::string& path)
+{
+	return ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path);
 }

@@ -11,6 +11,7 @@
 #include <DirectXMath.h>
 #include <stdexcept>
 #include <string>
+#include <commdlg.h>
 #include "d3dx12.h"
 #include "Camera.h"
 #include "Matrix4x4.h"

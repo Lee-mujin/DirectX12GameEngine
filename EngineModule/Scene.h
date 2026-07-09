@@ -21,7 +21,11 @@ public:
     void SetMainLight(const DirectionalLight& light) { mMainLight = light; }
     void SetPointLight(const PointLight& light) { mPointLight = light; }
     void SetSpotLight(const SpotLight& light) { mSpotLight = light; }
-
+public:
+    DirectionalLight& GetMainLight() { return mMainLight; } //const 아닌 참조로
+    PointLight& GetPointLight() { return mPointLight; }
+    SpotLight& GetSpotLight() { return mSpotLight; }
+    const std::vector<std::shared_ptr<GameObject>>& GetGameObjects() const { return mObjects; }
 private:
     std::vector<std::shared_ptr<GameObject>> mObjects;
     CameraComponent* mMainCamera = nullptr;

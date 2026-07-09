@@ -9,8 +9,8 @@ struct SpotLight
     float Intensity = 1.0f;
     float Range = 10.0f;
 
-    float InnerConeAngle = 15.0f; // degree, 이 각도 안쪽은 감쇠 없음
-    float OuterConeAngle = 25.0f; // degree, 이 각도 밖은 빛 없음
+    float InnerConeAngle = 15.0f; //이 각도 안쪽은 감쇠x
+    float OuterConeAngle = 25.0f; //이 각도 밖은 빛x
 
     bool Enabled = false;
 };

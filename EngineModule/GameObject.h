@@ -39,8 +39,11 @@ public:
 
     Transform& GetTransform() { return mTransform; }
     const Transform& GetTransform() const { return mTransform; }
-
+    const std::string& GetName() const { return mName; }
+    void SetName(const std::string& name) { mName = name; }
 protected:
     Transform mTransform;
     std::vector<std::unique_ptr<Component>> mComponents;
+private:
+    std::string mName = "GameObject";
 };

@@ -9,6 +9,9 @@ using Microsoft::WRL::ComPtr;
 class Mesh
 {
 public:
+    Mesh() = default; //생성자선언
+    virtual ~Mesh() = default; //가상 소멸자 추가
+
     void Create(ID3D12Device* device, const std::vector<Vertex>& vertices, const std::vector<UINT16>& indices);
 
     const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return mVertexBufferView; }

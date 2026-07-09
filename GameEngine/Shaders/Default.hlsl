@@ -1,6 +1,8 @@
 cbuffer ObjectCB : register(b0)
 {
     matrix gWorld;
+    float3 gMaterialColor;
+    float gShininess;
 };
 
 cbuffer CameraCB : register(b1)
@@ -9,6 +11,13 @@ cbuffer CameraCB : register(b1)
     matrix gProj;
     float3 gCameraPos;
     float gCameraPad;
+};
+
+#define MAX_BONES 96
+
+cbuffer BoneCB : register(b3)
+{
+    matrix gBoneMatrices[MAX_BONES];
 };
 
 cbuffer LightCB : register(b2)
@@ -58,6 +67,39 @@ struct PSInput
     float2 uv : TEXCOORD0;
 };
 
+struct SkinnedVSInput
+{
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float4 color : COLOR;
+    float2 uv : TEXCOORD;
+    uint4 boneIndices : BONEINDICES;
+    float4 boneWeights : BONEWEIGHTS;
+};
+
+PSInput VSMain_Skinned(SkinnedVSInput input)
+{
+    PSInput output;
+
+    matrix skinMatrix =
+        gBoneMatrices[input.boneIndices.x] * input.boneWeights.x +
+        gBoneMatrices[input.boneIndices.y] * input.boneWeights.y +
+        gBoneMatrices[input.boneIndices.z] * input.boneWeights.z +
+        gBoneMatrices[input.boneIndices.w] * input.boneWeights.w;
+
+    float4 skinnedPos = mul(float4(input.position, 1.0f), skinMatrix);
+    float3 skinnedNormal = mul(input.normal, (float3x3) skinMatrix);
+
+    float4 worldPos = mul(skinnedPos, gWorld);
+    output.worldPos = worldPos.xyz;
+    output.position = mul(mul(worldPos, gView), gProj);
+    output.normalWS = normalize(mul(skinnedNormal, (float3x3) gWorld));
+    output.color = input.color;
+    output.uv = input.uv;
+
+    return output;
+}
+
 PSInput VSMain(VSInput input)
 {
     PSInput output;
@@ -102,7 +144,7 @@ float3 CalcSpotLight(float3 worldPos, float3 normal, float3 viewDir)
 
     float3 halfDir = normalize(lightDir + viewDir);
     float NdotH = saturate(dot(normal, halfDir));
-    float3 specular = gSpotLightColor * pow(NdotH, 32.0f) * NdotL;
+    float3 specular = gSpotLightColor * pow(NdotH, gShininess) * NdotL;
 
     return (diffuse + specular * 0.3f) * attenuation * spotFactor;
 }
@@ -115,7 +157,7 @@ float3 CalcDirLight(float3 normal, float3 viewDir)
 
     float3 halfDir = normalize(lightDir + viewDir);
     float NdotH = saturate(dot(normal, halfDir));
-    float3 specular = gDirLightColor * pow(NdotH, 32.0f) * NdotL;
+    float3 specular = gDirLightColor * pow(NdotH, gShininess) * NdotL;
 
     return diffuse + specular * 0.3f;
 }
@@ -139,7 +181,7 @@ float3 CalcPointLight(float3 worldPos, float3 normal, float3 viewDir)
 
     float3 halfDir = normalize(lightDir + viewDir);
     float NdotH = saturate(dot(normal, halfDir));
-    float3 specular = gPointLightColor * pow(NdotH, 32.0f) * NdotL;
+    float3 specular = gPointLightColor * pow(NdotH, gShininess) * NdotL;
 
     return (diffuse + specular * 0.3f) * attenuation;
 }
@@ -147,14 +189,14 @@ float3 CalcPointLight(float3 worldPos, float3 normal, float3 viewDir)
 float4 PSMain(PSInput input) : SV_TARGET
 {
     float4 texColor = gTexture.Sample(gSampler, input.uv);
-    float4 baseColor = texColor * input.color;
+    float4 baseColor = texColor * input.color * float4(gMaterialColor, 1.0f);
 
     float3 normal = normalize(input.normalWS);
     float3 viewDir = normalize(gCameraPos - input.worldPos);
 
     float3 lighting = CalcDirLight(normal, viewDir)
-    + CalcPointLight(input.worldPos, normal, viewDir)
-    + CalcSpotLight(input.worldPos, normal, viewDir);
+        + CalcPointLight(input.worldPos, normal, viewDir)
+        + CalcSpotLight(input.worldPos, normal, viewDir);
 
     return float4(baseColor.rgb * lighting, baseColor.a);
 }

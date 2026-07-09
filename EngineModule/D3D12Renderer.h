@@ -15,6 +15,7 @@ class Material;
 class Camera;
 class Texture;
 class ImGuiLayer;
+class SkinnedMesh;
 struct Matrix4x4;
 struct DirectionalLight;
 struct PointLight;
@@ -32,7 +33,7 @@ public:
 
     bool AllocateSrvSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu);
     void SetImGuiLayer(ImGuiLayer* layer) { mImGuiLayer = layer; }
-
+    void DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix);
 public:
     ID3D12Device* GetDevice() const { return mDevice.Get(); }
     std::shared_ptr<Texture> LoadTextureFromFile(const std::wstring& path);
@@ -58,8 +59,9 @@ private:
     void CreateShader();
     void CreateRootSignature();
     void CreatePSO();
+    void CreateSkinnedPSO();
 
-    void WaitForGpu(); // Cleanup에서만 사용 (전체 GPU 대기)
+    void WaitForGpu(); // Cleanup에서만 사용
 
 private:
     static constexpr UINT kFrameCount = 2;
@@ -100,6 +102,9 @@ private:
     ComPtr<ID3D12PipelineState> mPSO;
     ComPtr<ID3DBlob> mVertexShader;
     ComPtr<ID3DBlob> mPixelShader;
+
+    ComPtr<ID3DBlob> mSkinnedVertexShader;
+    ComPtr<ID3D12PipelineState> mSkinnedPSO;
 
     D3D12_VIEWPORT mViewport{};
     D3D12_RECT mScissorRect{};

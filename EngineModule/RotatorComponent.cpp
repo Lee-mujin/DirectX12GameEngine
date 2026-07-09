@@ -1,4 +1,3 @@
-// RotatorComponent.cpp
 #include "pch.h"
 
 void RotatorComponent::Update(float deltaTime)

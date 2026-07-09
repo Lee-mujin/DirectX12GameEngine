@@ -6,6 +6,10 @@
 #include "SceneManager.h"
 #include "ResourceManager.h"
 #include "ImGuiLayer.h"
+#include "EditorState.h"
+#include "Hierarchy.h"
+#include "Inspector.h"
+#include "Light.h"
 
 class Application
 {
@@ -22,4 +26,8 @@ private:
     SceneManager mSceneManager;
     ResourceManager mResourceManager;
     ImGuiLayer mImGuiLayer;
+    EditorState mEditorState;
+    Hierarchy mHierarchy;
+    Inspector mInspector;
+	Light mLight;
 };

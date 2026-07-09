@@ -13,7 +13,11 @@ public:
     std::shared_ptr<Texture> GetTexture() const { return mTexture; }
     void SetTexture(std::shared_ptr<Texture> texture) { mTexture = texture; }
 
+    float GetShininess() const { return mShininess; }
+    void SetShininess(float shininess) { mShininess = shininess; }
+
 private:
     Vector3 mColor{ 1.0f, 1.0f, 1.0f };
     std::shared_ptr<Texture> mTexture;
+    float mShininess = 32.0f;
 };

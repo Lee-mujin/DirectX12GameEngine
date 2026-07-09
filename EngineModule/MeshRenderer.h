@@ -13,6 +13,8 @@ public:
 
     void Render(D3D12Renderer& renderer) override;
 
+    std::shared_ptr<Material> GetMaterial() const { return mMaterial; }
+
 private:
     std::shared_ptr<Mesh> mMesh;
     std::shared_ptr<Material> mMaterial;

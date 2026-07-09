@@ -52,6 +52,9 @@
     <Filter Include="ImGui">
       <UniqueIdentifier>{a814c50d-8a1b-4d01-9752-b7575570ddff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Editor">
+      <UniqueIdentifier>{769b5461-52e9-4cde-9d5c-0351dd4aea47}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -132,6 +135,30 @@
     <ClInclude Include="ImGuiLayer.h">
       <Filter>Cores\h</Filter>
     </ClInclude>
+    <ClInclude Include="EditorState.h">
+      <Filter>Cores\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Inspector.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Hierarchy.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelLoader.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\GameEngine\ThirdParty\cgltf.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Skeleton.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="SkinnedMesh.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -211,6 +238,21 @@
     </ClCompile>
     <ClCompile Include="..\GameEngine\ThirdParty\ImGui\backends\imgui_impl_win32.cpp">
       <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="Hierarchy.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Inspector.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Light.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelLoader.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="CgltfImpl.cpp">
+      <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

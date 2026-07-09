@@ -28,7 +28,7 @@ void Camera::Update(Input* input, float deltaTime)
         return;
     }
 
-    if (input->IsMouseDown(1)) // 우클릭 누르고 있는 동안만 시점 회전
+    if (input->IsMouseDown(1)) //우클릭 누르고 있는 동안만 시점 회전
     {
         mYaw += input->GetMouseDeltaX() * mLookSpeed;
         mPitch -= input->GetMouseDeltaY() * mLookSpeed;
