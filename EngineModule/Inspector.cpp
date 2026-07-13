@@ -105,21 +105,20 @@ void Inspector::Draw(EditorState& editorState)
         if (ImGui::CollapsingHeader("Animator", ImGuiTreeNodeFlags_DefaultOpen))
         {
             const auto& animList = animator->GetAnimationList();
-            int currentIndex = animator->GetCurrentAnimationIndex();
 
             if (!animList.empty())
             {
-                std::string previewName = (currentIndex >= 0) ? animList[currentIndex]->Name : "(None)";
+                std::string previewName = animator->GetCurrentClipName();
+                if (previewName.empty()) previewName = "(None)";
 
                 if (ImGui::BeginCombo("Clip", previewName.c_str()))
                 {
-                    for (int i = 0; i < static_cast<int>(animList.size()); ++i)
+                    for (auto& clip : animList)
                     {
-                        bool isSelected = (i == currentIndex);
-                        if (ImGui::Selectable(animList[i]->Name.c_str(), isSelected))
+                        bool isSelected = (clip->Name == animator->GetCurrentClipName());
+                        if (ImGui::Selectable(clip->Name.c_str(), isSelected))
                         {
-                            animator->SetAnimationByIndex(i);
-                            animator->Play();
+                            animator->Play(clip->Name); // 인덱스 아니라 이름으로 전환
                         }
                     }
                     ImGui::EndCombo();
@@ -131,18 +130,29 @@ void Inspector::Draw(EditorState& editorState)
             }
 
             bool isPlaying = animator->IsPlaying();
-
             if (isPlaying)
             {
                 if (ImGui::Button("Pause")) animator->Pause();
             }
             else
             {
-                if (ImGui::Button("Play")) animator->Play();
+                if (ImGui::Button("Play")) animator->Resume();
             }
 
             ImGui::SameLine();
             if (ImGui::Button("Stop")) animator->Stop();
+
+            float speed = animator->GetSpeed();
+            if (ImGui::DragFloat("Speed", &speed, 0.05f, 0.0f, 5.0f))
+            {
+                animator->SetSpeed(speed);
+            }
+
+            bool loop = animator->IsLooping();
+            if (ImGui::Checkbox("Loop", &loop))
+            {
+                animator->SetLoop(loop);
+            }
 
             float duration = animator->GetDuration();
             float currentTime = animator->GetCurrentTime();
