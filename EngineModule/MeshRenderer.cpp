@@ -13,7 +13,7 @@ void MeshRenderer::Render(D3D12Renderer& renderer)
     {
         AnimatorComponent* animator = GetOwner()->GetComponent<AnimatorComponent>();
 
-        static const std::vector<Matrix4x4> kIdentityFallback; // animator 없으면 빈 벡터 -> 렌더러가 항등행렬로 채움
+        static const std::vector<Matrix4x4> kIdentityFallback; //animator 없으면 빈 벡터 -> 렌더러가 항등행렬로 채움
 
         const std::vector<Matrix4x4>& boneMatrices = animator ? animator->GetFinalBoneMatrices() : kIdentityFallback;
 

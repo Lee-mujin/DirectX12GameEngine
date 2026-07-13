@@ -55,7 +55,7 @@ void AnimatorComponent::Update(float deltaTime)
     const size_t boneCount = mSkeleton->Bones.size();
     std::vector<Matrix4x4> localTransforms(boneCount);
 
-    // 1) 각 본의 로컬 트랜스폼만 먼저 전부 계산
+    // 1 각 본의 로컬 트랜스폼만 먼저 전부 계산
     for (size_t i = 0; i < boneCount; ++i)
     {
         const Bone& bone = mSkeleton->Bones[i];
@@ -79,14 +79,14 @@ void AnimatorComponent::Update(float deltaTime)
         localTransforms[i] = localTransform;
     }
 
-    // 2) 재귀로 월드 트랜스폼 계산 (배열 순서와 무관하게 항상 부모 먼저 보장)
+    // 2 재귀로 월드 트랜스폼 계산
     std::vector<bool> computed(boneCount, false);
     for (size_t i = 0; i < boneCount; ++i)
     {
         ComputeBoneWorldTransform(static_cast<int>(i), computed, localTransforms);
     }
 
-    // 3) 최종 스키닝 팔레트
+    // 3 최종 스키닝 팔레트
     for (size_t i = 0; i < boneCount; ++i)
     {
         mFinalBoneMatrices[i] = mSkeleton->Bones[i].OffsetMatrix * mBoneWorldTransforms[i];
@@ -104,7 +104,7 @@ void AnimatorComponent::ComputeBoneWorldTransform(int boneIndex, std::vector<boo
 
     if (parentIndex >= 0)
     {
-        ComputeBoneWorldTransform(parentIndex, computed, localTransforms); // 부모부터 먼저 확실히 계산
+        ComputeBoneWorldTransform(parentIndex, computed, localTransforms); //부모부터 먼저 계산
         mBoneWorldTransforms[boneIndex] = localTransforms[boneIndex] * mBoneWorldTransforms[parentIndex];
     }
     else
@@ -113,4 +113,30 @@ void AnimatorComponent::ComputeBoneWorldTransform(int boneIndex, std::vector<boo
     }
 
     computed[boneIndex] = true;
+}
+
+float AnimatorComponent::GetDuration() const
+{
+    return mAnimation ? mAnimation->Duration : 0.0f;
+}
+
+void AnimatorComponent::SetAnimationList(std::vector<std::shared_ptr<Animation>> animations)
+{
+    mAnimationList = std::move(animations);
+
+    if (!mAnimationList.empty())
+    {
+        SetAnimationByIndex(0); // 기본값: 첫 클립
+    }
+}
+
+void AnimatorComponent::SetAnimationByIndex(int index)
+{
+    if (index < 0 || index >= static_cast<int>(mAnimationList.size()))
+    {
+        return;
+    }
+
+    mCurrentAnimIndex = index;
+    SetAnimation(mAnimationList[index]);
 }

@@ -56,7 +56,6 @@ bool Application::Initialize(HINSTANCE hInstance)
     auto testObject = std::make_shared<GameObject>();
     testObject->SetName("GltfTest");
     MeshRenderer* gltfMeshRenderer = testObject->AddComponent<MeshRenderer>();
-
     auto gltfMesh = mResourceManager.LoadStaticModel("Textures/Box.gltf");
     if (gltfMesh)
     {
@@ -71,7 +70,8 @@ bool Application::Initialize(HINSTANCE hInstance)
     auto charObject = std::make_shared<GameObject>();
     charObject->SetName("Character");
     MeshRenderer* charRenderer = charObject->AddComponent<MeshRenderer>();
-    auto skinnedMesh = mResourceManager.LoadSkinnedModel("Textures/Cha.glb");
+    std::vector<std::shared_ptr<Animation>> animations;
+    auto skinnedMesh = mResourceManager.LoadSkinnedModel("Textures/Char2.glb", &animations);
     if (skinnedMesh)
     {
         charRenderer->SetMesh(skinnedMesh);
@@ -82,15 +82,11 @@ bool Application::Initialize(HINSTANCE hInstance)
 
         AnimatorComponent* animator = charObject->AddComponent<AnimatorComponent>();
         animator->SetSkeleton(skinnedMesh->GetSkeleton());
-
-        auto animation = mResourceManager.LoadAnimation("Textures/Cha.glb", skinnedMesh->GetSkeleton());
-        if (animation)
-        {
-            animator->SetAnimation(animation);
-            animator->Play();
-        }
+        animator->SetAnimationList(animations);
+        animator->Play();
     }
     charObject->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
+    charObject->GetTransform().SetRotation(Vector3(90.0f, 0.0f, 0.0f));
     scene->AddGameObject(charObject);
 
     //DirectionalLight

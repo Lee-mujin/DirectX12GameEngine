@@ -92,12 +92,7 @@ std::shared_ptr<Mesh> ResourceManager::LoadStaticModel(const std::string& path)
     return ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
 }
 
-std::shared_ptr<SkinnedMesh> ResourceManager::LoadSkinnedModel(const std::string& path)
+std::shared_ptr<SkinnedMesh> ResourceManager::LoadSkinnedModel(const std::string& path, std::vector<std::shared_ptr<Animation>>* outAnimations)
 {
-    return ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path);
-}
-
-std::shared_ptr<Animation> ResourceManager::LoadAnimation(const std::string& path, std::shared_ptr<Skeleton> skeleton)
-{
-    return ModelLoader::LoadAnimation(path, skeleton);
+    return ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path, outAnimations);
 }

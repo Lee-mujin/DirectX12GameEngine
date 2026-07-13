@@ -17,8 +17,7 @@ public:
     std::shared_ptr<Texture> LoadTexture(const std::wstring& path);
     std::shared_ptr<Texture> GetDefaultWhiteTexture();
     std::shared_ptr<Mesh> LoadStaticModel(const std::string& path);
-	std::shared_ptr<SkinnedMesh> LoadSkinnedModel(const std::string& path);
-    std::shared_ptr<Animation> LoadAnimation(const std::string& path, std::shared_ptr<Skeleton> skeleton);
+    std::shared_ptr<SkinnedMesh> LoadSkinnedModel(const std::string& path, std::vector<std::shared_ptr<Animation>>* outAnimations = nullptr);
 private:
     D3D12Renderer* mRenderer = nullptr;
     std::shared_ptr<Mesh> mCubeMesh;

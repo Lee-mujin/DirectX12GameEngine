@@ -5,6 +5,7 @@
 #include "MeshRenderer.h"
 #include "Texture.h"
 #include "imgui.h"
+#include "Animation.h"
 
 void Inspector::Draw(EditorState& editorState)
 {
@@ -96,6 +97,62 @@ void Inspector::Draw(EditorState& editorState)
             {
                 ImGui::Text("(No Material)");
             }
+        }
+    }
+
+    if (AnimatorComponent* animator = selected->GetComponent<AnimatorComponent>())
+    {
+        if (ImGui::CollapsingHeader("Animator", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            const auto& animList = animator->GetAnimationList();
+            int currentIndex = animator->GetCurrentAnimationIndex();
+
+            if (!animList.empty())
+            {
+                std::string previewName = (currentIndex >= 0) ? animList[currentIndex]->Name : "(None)";
+
+                if (ImGui::BeginCombo("Clip", previewName.c_str()))
+                {
+                    for (int i = 0; i < static_cast<int>(animList.size()); ++i)
+                    {
+                        bool isSelected = (i == currentIndex);
+                        if (ImGui::Selectable(animList[i]->Name.c_str(), isSelected))
+                        {
+                            animator->SetAnimationByIndex(i);
+                            animator->Play();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+            else
+            {
+                ImGui::Text("(No animation clips)");
+            }
+
+            bool isPlaying = animator->IsPlaying();
+
+            if (isPlaying)
+            {
+                if (ImGui::Button("Pause")) animator->Pause();
+            }
+            else
+            {
+                if (ImGui::Button("Play")) animator->Play();
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Stop")) animator->Stop();
+
+            float duration = animator->GetDuration();
+            float currentTime = animator->GetCurrentTime();
+
+            if (ImGui::SliderFloat("Time", &currentTime, 0.0f, duration > 0.0f ? duration : 0.001f))
+            {
+                animator->SetCurrentTime(currentTime);
+            }
+
+            ImGui::Text("Duration: %.2f s", duration);
         }
     }
 

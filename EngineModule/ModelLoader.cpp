@@ -128,8 +128,15 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, const st
     return result;
 }
 
-std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(ID3D12Device* device, const std::string& path)
+std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
+    ID3D12Device* device, const std::string& path,
+    std::vector<std::shared_ptr<Animation>>* outAnimations)
 {
+    if (outAnimations)
+    {
+        outAnimations->clear();
+    }
+
     cgltf_options options = {};
     cgltf_data* data = nullptr;
 
@@ -166,7 +173,6 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(ID3D12Device* device, 
         cgltf_accessor_read_float(skin.inverse_bind_matrices, i, offsetMat, 16);
         skeleton->Bones[i].OffsetMatrix = CgltfMatrixToOurMatrix(offsetMat);
 
-        // 로컬 바인드 트랜스폼 (노드의 T/R/S로부터 구성)
         Vector3 pos(joint->translation[0], joint->translation[1], joint->translation[2]);
         Quaternion rot(joint->rotation[0], joint->rotation[1], joint->rotation[2], joint->rotation[3]);
         rot.Normalize();
@@ -190,17 +196,12 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(ID3D12Device* device, 
                     break;
                 }
             }
-
-            if (found)
-            {
-                break;
-            }
-
+            if (found) break;
             searchParent = searchParent->parent;
         }
     }
 
-    // 2) 정점 데이터 (POSITION/NORMAL/UV + JOINTS/WEIGHTS)
+    // 2) 정점 데이터 (기존 그대로)
     cgltf_accessor* positionAccessor = nullptr;
     cgltf_accessor* normalAccessor = nullptr;
     cgltf_accessor* uvAccessor = nullptr;
@@ -293,117 +294,105 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(ID3D12Device* device, 
         }
     }
 
+    // 3) 애니메이션 - 파일에 있는 모든 클립을 파싱해서 목록으로 반환
+    if (outAnimations && data->animations_count > 0)
+    {
+        for (size_t a = 0; a < data->animations_count; ++a)
+        {
+            const cgltf_animation& srcAnim = data->animations[a];
+
+            auto animation = std::make_shared<Animation>();
+            animation->Name = srcAnim.name ? srcAnim.name : ("Animation_" + std::to_string(a));
+            animation->Channels.resize(skeleton->Bones.size());
+            for (size_t i = 0; i < skeleton->Bones.size(); ++i)
+            {
+                animation->Channels[i].BoneIndex = static_cast<int>(i);
+            }
+
+            float maxTime = 0.0f;
+            int matchedChannelCount = 0;
+
+            for (size_t c = 0; c < srcAnim.channels_count; ++c)
+            {
+                const cgltf_animation_channel& channel = srcAnim.channels[c];
+                const cgltf_animation_sampler& sampler = *channel.sampler;
+                cgltf_node* targetNode = channel.target_node;
+
+                int boneIndex = -1;
+                for (size_t b = 0; b < skin.joints_count; ++b)
+                {
+                    if (skin.joints[b] == targetNode)
+                    {
+                        boneIndex = static_cast<int>(b);
+                        break;
+                    }
+                }
+
+                if (boneIndex < 0)
+                {
+                    continue;
+                }
+                ++matchedChannelCount;
+
+                size_t keyCount = sampler.input->count;
+                std::vector<float> times(keyCount);
+                for (size_t k = 0; k < keyCount; ++k)
+                {
+                    cgltf_accessor_read_float(sampler.input, k, &times[k], 1);
+                    maxTime = (times[k] > maxTime) ? times[k] : maxTime;
+                }
+
+                BoneKeyframes& boneChannel = animation->Channels[boneIndex];
+
+                if (channel.target_path == cgltf_animation_path_type_translation)
+                {
+                    boneChannel.PositionTimes = times;
+                    boneChannel.Positions.resize(keyCount);
+                    for (size_t k = 0; k < keyCount; ++k)
+                    {
+                        float v[3] = {};
+                        cgltf_accessor_read_float(sampler.output, k, v, 3);
+                        boneChannel.Positions[k] = Vector3(v[0], v[1], v[2]);
+                    }
+                }
+                else if (channel.target_path == cgltf_animation_path_type_rotation)
+                {
+                    boneChannel.RotationTimes = times;
+                    boneChannel.Rotations.resize(keyCount);
+                    for (size_t k = 0; k < keyCount; ++k)
+                    {
+                        float v[4] = {};
+                        cgltf_accessor_read_float(sampler.output, k, v, 4);
+                        boneChannel.Rotations[k] = Quaternion(v[0], v[1], v[2], v[3]);
+                    }
+                }
+                else if (channel.target_path == cgltf_animation_path_type_scale)
+                {
+                    boneChannel.ScaleTimes = times;
+                    boneChannel.Scales.resize(keyCount);
+                    for (size_t k = 0; k < keyCount; ++k)
+                    {
+                        float v[3] = {};
+                        cgltf_accessor_read_float(sampler.output, k, v, 3);
+                        boneChannel.Scales[k] = Vector3(v[0], v[1], v[2]);
+                    }
+                }
+            }
+
+            animation->Duration = maxTime;
+
+            if (matchedChannelCount > 0)
+            {
+                outAnimations->push_back(animation);
+            }
+        }
+    }
+
     cgltf_free(data);
 
     auto result = std::make_shared<SkinnedMesh>();
     result->Create(device, vertices, indices);
     result->SetSkeleton(skeleton);
+
     return result;
-}
-
-std::shared_ptr<Animation> ModelLoader::LoadAnimation(const std::string& path, std::shared_ptr<Skeleton> skeleton)
-{
-    cgltf_options options = {};
-    cgltf_data* data = nullptr;
-
-    if (cgltf_parse_file(&options, path.c_str(), &data) != cgltf_result_success)
-    {
-        return nullptr;
-    }
-
-    if (cgltf_load_buffers(&options, data, path.c_str()) != cgltf_result_success)
-    {
-        cgltf_free(data);
-        return nullptr;
-    }
-
-    if (data->animations_count == 0 || !skeleton)
-    {
-        cgltf_free(data);
-        return nullptr;
-    }
-
-    const cgltf_animation& srcAnim = data->animations[0];
-
-    auto anim = std::make_shared<Animation>();
-    anim->Name = srcAnim.name ? srcAnim.name : "Animation";
-    anim->Channels.resize(skeleton->Bones.size());
-
-    for (size_t i = 0; i < skeleton->Bones.size(); ++i)
-    {
-        anim->Channels[i].BoneIndex = static_cast<int>(i);
-    }
-
-    float maxTime = 0.0f;
-
-    for (size_t c = 0; c < srcAnim.channels_count; ++c)
-    {
-        const cgltf_animation_channel& channel = srcAnim.channels[c];
-        const cgltf_animation_sampler& sampler = *channel.sampler;
-        cgltf_node* targetNode = channel.target_node;
-
-        int boneIndex = -1;
-        for (size_t b = 0; b < skeleton->Bones.size(); ++b)
-        {
-            if (skeleton->Bones[b].Name == (targetNode->name ? targetNode->name : ""))
-            {
-                boneIndex = static_cast<int>(b);
-                break;
-            }
-        }
-
-        if (boneIndex < 0)
-        {
-            continue;
-        }
-
-        size_t keyCount = sampler.input->count;
-        std::vector<float> times(keyCount);
-        for (size_t k = 0; k < keyCount; ++k)
-        {
-            cgltf_accessor_read_float(sampler.input, k, &times[k], 1);
-            maxTime = (times[k] > maxTime) ? times[k] : maxTime;
-        }
-
-        BoneKeyframes& boneChannel = anim->Channels[boneIndex];
-
-        if (channel.target_path == cgltf_animation_path_type_translation)
-        {
-            boneChannel.PositionTimes = times;
-            boneChannel.Positions.resize(keyCount);
-            for (size_t k = 0; k < keyCount; ++k)
-            {
-                float v[3] = {};
-                cgltf_accessor_read_float(sampler.output, k, v, 3);
-                boneChannel.Positions[k] = Vector3(v[0], v[1], v[2]);
-            }
-        }
-        else if (channel.target_path == cgltf_animation_path_type_rotation)
-        {
-            boneChannel.RotationTimes = times;
-            boneChannel.Rotations.resize(keyCount);
-            for (size_t k = 0; k < keyCount; ++k)
-            {
-                float v[4] = {};
-                cgltf_accessor_read_float(sampler.output, k, v, 4);
-                boneChannel.Rotations[k] = Quaternion(v[0], v[1], v[2], v[3]);
-            }
-        }
-        else if (channel.target_path == cgltf_animation_path_type_scale)
-        {
-            boneChannel.ScaleTimes = times;
-            boneChannel.Scales.resize(keyCount);
-            for (size_t k = 0; k < keyCount; ++k)
-            {
-                float v[3] = {};
-                cgltf_accessor_read_float(sampler.output, k, v, 3);
-                boneChannel.Scales[k] = Vector3(v[0], v[1], v[2]);
-            }
-        }
-    }
-
-    anim->Duration = maxTime;
-
-    cgltf_free(data);
-    return anim;
 }
