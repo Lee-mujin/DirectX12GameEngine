@@ -165,6 +165,9 @@
     <ClInclude Include="AnimatorComponent.h">
       <Filter>Scene\h</Filter>
     </ClInclude>
+    <ClInclude Include="ContentBrowser.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -265,6 +268,9 @@
     </ClCompile>
     <ClCompile Include="AnimatorComponent.cpp">
       <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="ContentBrowser.cpp">
+      <Filter>Editor</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

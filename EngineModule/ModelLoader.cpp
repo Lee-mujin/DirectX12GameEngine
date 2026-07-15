@@ -181,6 +181,10 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         skeleton->Bones[i].LocalBindTransform =
             Matrix4x4::Scale(scale) * Matrix4x4::Rotate(rot) * Matrix4x4::Translate(pos);
 
+        skeleton->Bones[i].BindPosition = pos;      // 추가
+        skeleton->Bones[i].BindRotation = rot;      // 추가
+        skeleton->Bones[i].BindScale = scale;       // 추가
+
         skeleton->Bones[i].ParentIndex = -1;
 
         cgltf_node* searchParent = joint->parent;

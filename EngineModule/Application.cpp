@@ -47,47 +47,21 @@ bool Application::Initialize(HINSTANCE hInstance)
     meshRenderer->SetMesh(mResourceManager.GetCubeMesh());
     //머테리얼로 텍스처를 입힘
     auto material = std::make_shared<Material>();
-    material->SetTexture(mResourceManager.LoadTexture(L"Textures/Box.jpg"));
+    material->SetTexture(mResourceManager.LoadTexture(L"Assets/Textures/Box.jpg"));
     meshRenderer->SetMaterial(material);
     //회전추가
     cube->AddComponent<RotatorComponent>(90.0f);
     scene->AddGameObject(cube);
 
-    auto testObject = std::make_shared<GameObject>();
-    testObject->SetName("GltfTest");
-    MeshRenderer* gltfMeshRenderer = testObject->AddComponent<MeshRenderer>();
-    auto gltfMesh = mResourceManager.LoadStaticModel("Textures/Box.gltf");
-    if (gltfMesh)
-    {
-        gltfMeshRenderer->SetMesh(gltfMesh);
+    mContentBrowser.Initialize("Assets", [this](const std::filesystem::path& path)
+        {
+            SpawnAssetIntoScene(path);
+        });
 
-        auto material = std::make_shared<Material>();
-        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
-        gltfMeshRenderer->SetMaterial(material);
-    }
-    scene->AddGameObject(testObject);
-
-    auto charObject = std::make_shared<GameObject>();
-    charObject->SetName("Character");
-    MeshRenderer* charRenderer = charObject->AddComponent<MeshRenderer>();
-    std::vector<std::shared_ptr<Animation>> animations;
-    auto skinnedMesh = mResourceManager.LoadSkinnedModel("Textures/Char2.glb", &animations);
-    if (skinnedMesh)
-    {
-        charRenderer->SetMesh(skinnedMesh);
-
-        auto material = std::make_shared<Material>();
-        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
-        charRenderer->SetMaterial(material);
-
-        AnimatorComponent* animator = charObject->AddComponent<AnimatorComponent>();
-        animator->SetSkeleton(skinnedMesh->GetSkeleton());
-        animator->SetAnimationList(animations);
-        animator->Play();
-    }
-    charObject->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
-    charObject->GetTransform().SetRotation(Vector3(90.0f, 0.0f, 0.0f));
-    scene->AddGameObject(charObject);
+    mHierarchy.SetOnAssetDropped([this](const std::filesystem::path& path)
+        {
+            SpawnAssetIntoScene(path);
+        });
 
     //DirectionalLight
     scene->SetMainLight(DirectionalLight{ Vector3(0.3f, -0.8f, 0.5f), Vector3(1.0f, 1.0f, 1.0f), 1.0f });
@@ -118,6 +92,64 @@ bool Application::Initialize(HINSTANCE hInstance)
     return true;
 }
 
+void Application::SpawnAssetIntoScene(const std::filesystem::path& assetPath)
+{
+    auto scene = mSceneManager.GetCurrentScene();
+    if (!scene)
+    {
+        return;
+    }
+
+    std::string ext = assetPath.extension().string();
+    if (ext != ".glb" && ext != ".gltf")
+    {
+        return; // 지금은 모델 파일만 처리
+    }
+
+    std::string pathStr = assetPath.string();
+
+    // 스킨(뼈대) 있는 모델인지 먼저 시도
+    if (const CachedSkinnedModel* cached = mResourceManager.GetOrLoadSkinnedModel(pathStr))
+    {
+        auto obj = std::make_shared<GameObject>();
+        obj->SetName(assetPath.stem().string());
+
+        MeshRenderer* renderer = obj->AddComponent<MeshRenderer>();
+        renderer->SetMesh(cached->Mesh);
+
+        auto material = std::make_shared<Material>();
+        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
+        renderer->SetMaterial(material);
+
+        AnimatorComponent* animator = obj->AddComponent<AnimatorComponent>();
+        animator->SetSkeleton(cached->Mesh->GetSkeleton());
+        animator->SetAnimationList(cached->Animations);
+        animator->Play();
+
+        obj->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
+        obj->GetTransform().SetRotation(Vector3(90.0f, 0.0f, 0.0f));
+
+        scene->AddGameObject(obj);
+        return;
+    }
+
+    // 스킨 없는 정적 모델
+    if (auto mesh = mResourceManager.GetOrLoadStaticModel(pathStr))
+    {
+        auto obj = std::make_shared<GameObject>();
+        obj->SetName(assetPath.stem().string());
+
+        MeshRenderer* renderer = obj->AddComponent<MeshRenderer>();
+        renderer->SetMesh(mesh);
+
+        auto material = std::make_shared<Material>();
+        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
+        renderer->SetMaterial(material);
+
+        scene->AddGameObject(obj);
+    }
+}
+
 void Application::Run()
 {
     while (mWindow.ProcessMessage())
@@ -134,6 +166,7 @@ void Application::Run()
             mLight.Draw(*scene);
         }
         mInspector.Draw(mEditorState);
+        mContentBrowser.Draw();
 
         mSceneManager.Update(&mInput, deltaTime); //로직 업뎃
         mSceneManager.Render(mRenderer); //렌더러를 이용해 씬

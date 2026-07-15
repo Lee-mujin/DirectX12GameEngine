@@ -118,7 +118,7 @@ void Inspector::Draw(EditorState& editorState)
                         bool isSelected = (clip->Name == animator->GetCurrentClipName());
                         if (ImGui::Selectable(clip->Name.c_str(), isSelected))
                         {
-                            animator->Play(clip->Name); // 인덱스 아니라 이름으로 전환
+                            animator->CrossFade(clip->Name, 0.3f); // 0.3초에 걸쳐 부드럽게 전환
                         }
                     }
                     ImGui::EndCombo();

@@ -87,12 +87,38 @@ std::shared_ptr<Texture> ResourceManager::GetDefaultWhiteTexture()
     return mDefaultWhiteTexture;
 }
 
-std::shared_ptr<Mesh> ResourceManager::LoadStaticModel(const std::string& path)
+std::shared_ptr<Mesh> ResourceManager::GetOrLoadStaticModel(const std::string& path)
 {
-    return ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
+    auto it = mStaticModelCache.find(path);
+    if (it != mStaticModelCache.end())
+    {
+        return it->second; // 이미 로드됨 -> 재사용
+    }
+
+    auto mesh = ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
+    if (mesh)
+    {
+        mStaticModelCache[path] = mesh;
+    }
+    return mesh;
 }
 
-std::shared_ptr<SkinnedMesh> ResourceManager::LoadSkinnedModel(const std::string& path, std::vector<std::shared_ptr<Animation>>* outAnimations)
+const CachedSkinnedModel* ResourceManager::GetOrLoadSkinnedModel(const std::string& path)
 {
-    return ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path, outAnimations);
+    auto it = mSkinnedModelCache.find(path);
+    if (it != mSkinnedModelCache.end())
+    {
+        return &it->second;
+    }
+
+    CachedSkinnedModel model;
+    model.Mesh = ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path, &model.Animations);
+
+    if (!model.Mesh)
+    {
+        return nullptr;
+    }
+
+    auto result = mSkinnedModelCache.emplace(path, std::move(model));
+    return &result.first->second;
 }

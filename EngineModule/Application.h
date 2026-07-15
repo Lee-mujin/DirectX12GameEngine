@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 #include "Window.h"
 #include "Timer.h"
 #include "Input.h"
@@ -10,6 +11,7 @@
 #include "Hierarchy.h"
 #include "Inspector.h"
 #include "Light.h"
+#include "ContentBrowser.h"
 
 class Application
 {
@@ -18,6 +20,8 @@ public:
     void Run();
     void Shutdown();
 
+private:
+    void SpawnAssetIntoScene(const std::filesystem::path& assetPath);
 private:
     Window mWindow;
     Timer mTimer;
@@ -30,4 +34,5 @@ private:
     Hierarchy mHierarchy;
     Inspector mInspector;
 	Light mLight;
+    ContentBrowser mContentBrowser;
 };
