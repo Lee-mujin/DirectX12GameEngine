@@ -157,6 +157,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\GameEngine\ThirdParty\cgltf.h" />
+    <ClInclude Include="..\GameEngine\ThirdParty\ImGui\ImGuizmo.h" />
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimatorComponent.h" />
     <ClInclude Include="Application.h" />
@@ -167,12 +168,14 @@
     <ClInclude Include="DirectionalLight.h" />
     <ClInclude Include="EditorState.h" />
     <ClInclude Include="FrameResource.h" />
+    <ClInclude Include="Gizmo.h" />
     <ClInclude Include="Hierarchy.h" />
     <ClInclude Include="ImGuiLayer.h" />
     <ClInclude Include="Inspector.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="PointLight.h" />
     <ClInclude Include="ResourceManager.h" />
@@ -186,6 +189,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="SceneSerializer.h" />
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="SkinnedMesh.h" />
     <ClInclude Include="SpotLight.h" />
@@ -202,6 +206,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\GameEngine\ThirdParty\ImGui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\GameEngine\ThirdParty\ImGui\ImGuizmo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\GameEngine\ThirdParty\ImGui\imgui_demo.cpp">
@@ -226,11 +233,13 @@
     </ClCompile>
     <ClCompile Include="ContentBrowser.cpp" />
     <ClCompile Include="FrameResource.cpp" />
+    <ClCompile Include="Gizmo.cpp" />
     <ClCompile Include="Hierarchy.cpp" />
     <ClCompile Include="ImGuiLayer.cpp" />
     <ClCompile Include="Inspector.cpp" />
     <ClCompile Include="Light.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ResourceManager.cpp" />
     <ClCompile Include="RotatorComponent.cpp" />
@@ -247,6 +256,7 @@
     </ClCompile>
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
+    <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="Window.cpp" />

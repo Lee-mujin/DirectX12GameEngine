@@ -1,4 +1,3 @@
-// Scene.cpp
 #include "pch.h"
 #include "Scene.h"
 #include "D3D12Renderer.h"
@@ -33,4 +32,15 @@ void Scene::Render(D3D12Renderer& renderer)
 void Scene::AddGameObject(std::shared_ptr<GameObject> object)
 {
     mObjects.push_back(object);
+}
+
+void Scene::ClearAssetObjects()
+{
+    mObjects.erase(
+        std::remove_if(mObjects.begin(), mObjects.end(),
+            [](const std::shared_ptr<GameObject>& obj)
+            {
+                return !obj->GetSourceAssetPath().empty();
+            }),
+        mObjects.end());
 }

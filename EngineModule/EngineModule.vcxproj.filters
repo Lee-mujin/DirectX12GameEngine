@@ -168,6 +168,18 @@
     <ClInclude Include="ContentBrowser.h">
       <Filter>Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Model.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\GameEngine\ThirdParty\ImGui\ImGuizmo.h">
+      <Filter>ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="Gizmo.h">
+      <Filter>Cores\h</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneSerializer.h">
+      <Filter>Scene\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -271,6 +283,18 @@
     </ClCompile>
     <ClCompile Include="ContentBrowser.cpp">
       <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Model.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\GameEngine\ThirdParty\ImGui\ImGuizmo.cpp">
+      <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="Gizmo.cpp">
+      <Filter>Cores\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneSerializer.cpp">
+      <Filter>Scene\cpp</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

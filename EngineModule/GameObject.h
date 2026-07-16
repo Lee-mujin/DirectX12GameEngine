@@ -40,10 +40,13 @@ public:
     Transform& GetTransform() { return mTransform; }
     const Transform& GetTransform() const { return mTransform; }
     const std::string& GetName() const { return mName; }
+    const std::string& GetSourceAssetPath() const { return mSourceAssetPath; }
+    void SetSourceAssetPath(const std::string& path) { mSourceAssetPath = path; }
     void SetName(const std::string& name) { mName = name; }
 protected:
     Transform mTransform;
     std::vector<std::unique_ptr<Component>> mComponents;
 private:
     std::string mName = "GameObject";
+    std::string mSourceAssetPath; // 프리미티브는 빈 문자열
 };

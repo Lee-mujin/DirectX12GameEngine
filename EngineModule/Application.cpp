@@ -5,6 +5,8 @@
 #include "SpotLight.h"
 #include "imgui.h"
 #include "SkinnedMesh.h"
+#include "Model.h"
+#include "SceneSerializer.h"
 
 bool Application::Initialize(HINSTANCE hInstance)
 {
@@ -92,62 +94,51 @@ bool Application::Initialize(HINSTANCE hInstance)
     return true;
 }
 
-void Application::SpawnAssetIntoScene(const std::filesystem::path& assetPath)
+std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(const std::filesystem::path& assetPath)
 {
     auto scene = mSceneManager.GetCurrentScene();
     if (!scene)
     {
-        return;
+        return nullptr;
     }
 
     std::string ext = assetPath.extension().string();
     if (ext != ".glb" && ext != ".gltf")
     {
-        return; // 지금은 모델 파일만 처리
+        return nullptr;
     }
 
     std::string pathStr = assetPath.string();
-
-    // 스킨(뼈대) 있는 모델인지 먼저 시도
-    if (const CachedSkinnedModel* cached = mResourceManager.GetOrLoadSkinnedModel(pathStr))
+    auto model = mResourceManager.GetOrLoadModel(pathStr);
+    if (!model)
     {
-        auto obj = std::make_shared<GameObject>();
-        obj->SetName(assetPath.stem().string());
+        return nullptr;
+    }
 
-        MeshRenderer* renderer = obj->AddComponent<MeshRenderer>();
-        renderer->SetMesh(cached->Mesh);
+    auto obj = std::make_shared<GameObject>();
+    obj->SetName(assetPath.stem().string());
+    obj->SetSourceAssetPath(pathStr);
 
-        auto material = std::make_shared<Material>();
-        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
-        renderer->SetMaterial(material);
+    MeshRenderer* renderer = obj->AddComponent<MeshRenderer>();
+    renderer->SetMesh(model->GetMesh());
 
+    auto material = std::make_shared<Material>();
+    material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
+    renderer->SetMaterial(material);
+
+    if (model->IsSkinned())
+    {
         AnimatorComponent* animator = obj->AddComponent<AnimatorComponent>();
-        animator->SetSkeleton(cached->Mesh->GetSkeleton());
-        animator->SetAnimationList(cached->Animations);
+        animator->SetSkeleton(model->GetSkeleton());
+        animator->SetAnimationList(model->GetAnimations());
         animator->Play();
 
         obj->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
         obj->GetTransform().SetRotation(Vector3(90.0f, 0.0f, 0.0f));
-
-        scene->AddGameObject(obj);
-        return;
     }
 
-    // 스킨 없는 정적 모델
-    if (auto mesh = mResourceManager.GetOrLoadStaticModel(pathStr))
-    {
-        auto obj = std::make_shared<GameObject>();
-        obj->SetName(assetPath.stem().string());
-
-        MeshRenderer* renderer = obj->AddComponent<MeshRenderer>();
-        renderer->SetMesh(mesh);
-
-        auto material = std::make_shared<Material>();
-        material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
-        renderer->SetMaterial(material);
-
-        scene->AddGameObject(obj);
-    }
+    mSceneManager.GetCurrentScene()->AddGameObject(obj);
+    return obj;
 }
 
 void Application::Run()
@@ -159,11 +150,39 @@ void Application::Run()
 
         mImGuiLayer.NewFrame();
 
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("Save Scene"))
+                {
+                    if (auto scene = mSceneManager.GetCurrentScene())
+                    {
+                        SceneSerializer::Save(*scene, "Assets/Scenes/scene.txt");
+                    }
+                }
+                if (ImGui::MenuItem("Load Scene"))
+                {
+                    if (auto scene = mSceneManager.GetCurrentScene())
+                    {
+                        SceneSerializer::Load(*scene, *this, "Assets/Scenes/scene.txt");
+                    }
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
         auto scene = mSceneManager.GetCurrentScene();
         if (scene)
         {
             mHierarchy.Draw(*scene, mEditorState);
             mLight.Draw(*scene);
+
+            if (CameraComponent* camComp = scene->GetMainCamera())
+            {
+                mGizmoPanel.Draw(mEditorState, camComp->GetCamera());
+            }
         }
         mInspector.Draw(mEditorState);
         mContentBrowser.Draw();

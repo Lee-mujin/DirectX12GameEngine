@@ -6,6 +6,7 @@
 #include "SkinnedMesh.h"
 #include "Skeleton.h"
 #include "Animation.h"
+#include "Model.h"
 
 void ResourceManager::Initialize(D3D12Renderer* renderer)
 {
@@ -87,38 +88,35 @@ std::shared_ptr<Texture> ResourceManager::GetDefaultWhiteTexture()
     return mDefaultWhiteTexture;
 }
 
-std::shared_ptr<Mesh> ResourceManager::GetOrLoadStaticModel(const std::string& path)
+std::shared_ptr<Model> ResourceManager::GetOrLoadModel(const std::string& path)
 {
-    auto it = mStaticModelCache.find(path);
-    if (it != mStaticModelCache.end())
+    auto it = mModelCache.find(path);
+    if (it != mModelCache.end())
     {
-        return it->second; // 이미 로드됨 -> 재사용
+        return it->second;
     }
 
-    auto mesh = ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
-    if (mesh)
+    auto model = std::make_shared<Model>();
+    model->SetSourcePath(path);
+
+    std::vector<std::shared_ptr<Animation>> animations;
+    auto skinnedMesh = ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path, &animations);
+
+    if (skinnedMesh)
     {
-        mStaticModelCache[path] = mesh;
+        model->SetSkinnedMesh(skinnedMesh);
+        model->SetAnimations(std::move(animations));
     }
-    return mesh;
-}
-
-const CachedSkinnedModel* ResourceManager::GetOrLoadSkinnedModel(const std::string& path)
-{
-    auto it = mSkinnedModelCache.find(path);
-    if (it != mSkinnedModelCache.end())
+    else
     {
-        return &it->second;
-    }
-
-    CachedSkinnedModel model;
-    model.Mesh = ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path, &model.Animations);
-
-    if (!model.Mesh)
-    {
-        return nullptr;
+        auto staticMesh = ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
+        if (!staticMesh)
+        {
+            return nullptr; // 둘 다 실패
+        }
+        model->SetStaticMesh(staticMesh);
     }
 
-    auto result = mSkinnedModelCache.emplace(path, std::move(model));
-    return &result.first->second;
+    mModelCache[path] = model;
+    return model;
 }

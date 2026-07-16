@@ -12,6 +12,7 @@
 #include "Inspector.h"
 #include "Light.h"
 #include "ContentBrowser.h"
+#include "Gizmo.h"
 
 class Application
 {
@@ -19,9 +20,7 @@ public:
     bool Initialize(HINSTANCE hInstance);
     void Run();
     void Shutdown();
-
-private:
-    void SpawnAssetIntoScene(const std::filesystem::path& assetPath);
+    std::shared_ptr<GameObject> SpawnAssetIntoScene(const std::filesystem::path& assetPath);
 private:
     Window mWindow;
     Timer mTimer;
@@ -35,4 +34,5 @@ private:
     Inspector mInspector;
 	Light mLight;
     ContentBrowser mContentBrowser;
+    Gizmo mGizmoPanel;
 };

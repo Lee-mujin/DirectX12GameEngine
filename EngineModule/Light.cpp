@@ -1,4 +1,3 @@
-// LightPanel.cpp
 #include "pch.h"
 #include "Light.h"
 #include "Scene.h"
@@ -62,8 +61,17 @@ void Light::Draw(Scene& scene)
         }
 
         ImGui::DragFloat("Range", &light.Range, 0.1f, 0.1f, 50.0f);
-        ImGui::DragFloat("Inner Cone Angle", &light.InnerConeAngle, 0.5f, 0.0f, light.OuterConeAngle);
-        ImGui::DragFloat("Outer Cone Angle", &light.OuterConeAngle, 0.5f, light.InnerConeAngle, 90.0f);
+
+        //Inner 각도는 항상 Outer 각도보다 작거나 같아야함
+        if (ImGui::DragFloat("Inner Cone Angle", &light.InnerConeAngle, 0.5f, 0.0f, light.OuterConeAngle))
+        {
+            if (light.InnerConeAngle > light.OuterConeAngle) light.InnerConeAngle = light.OuterConeAngle;
+        }
+
+        if (ImGui::DragFloat("Outer Cone Angle", &light.OuterConeAngle, 0.5f, light.InnerConeAngle, 90.0f))
+        {
+            if (light.OuterConeAngle < light.InnerConeAngle) light.OuterConeAngle = light.InnerConeAngle;
+        }
 
         ImGui::PopID();
     }
