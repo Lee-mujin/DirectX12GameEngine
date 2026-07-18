@@ -8,6 +8,8 @@
 #include "Animation.h"
 #include "Model.h"
 
+const std::string ResourceManager::kEmptyPath = "";
+
 void ResourceManager::Initialize(D3D12Renderer* renderer)
 {
     mRenderer = renderer;
@@ -87,17 +89,50 @@ std::shared_ptr<Texture> ResourceManager::GetDefaultWhiteTexture()
     }
     return mDefaultWhiteTexture;
 }
-
-std::shared_ptr<Model> ResourceManager::GetOrLoadModel(const std::string& path)
+//문자열 경로는 ContentBrowser와 ResourceManager::GetOrCreateHandle/GetPath 두 지점에서만
+//GameObject, Model, Scene, 저장 파일의 AssetPath 필드는 여전히 텍스트지만 로드 시 즉시 핸들로 변환
+AssetHandle ResourceManager::GetOrCreateHandle(const std::string& path)
 {
-    auto it = mModelCache.find(path);
-    if (it != mModelCache.end())
+    auto it = mPathToId.find(path);
+    if (it != mPathToId.end())
     {
-        return it->second;
+        return AssetHandle(it->second); // friend라 private 생성자 접근 가능
+    }
+
+    uint32_t id = mNextHandleId++;
+    mPathToId[path] = id;
+    mIdToPath[id] = path;
+
+    return AssetHandle(id);
+}
+
+const std::string& ResourceManager::GetPath(AssetHandle handle) const
+{
+    auto it = mIdToPath.find(handle.GetId());
+    return (it != mIdToPath.end()) ? it->second : kEmptyPath;
+}
+
+std::shared_ptr<Model> ResourceManager::GetOrLoadModel(AssetHandle handle)
+{
+    if (!handle.IsValid())
+    {
+        return nullptr;
+    }
+
+    auto cacheIt = mModelCache.find(handle.GetId());
+    if (cacheIt != mModelCache.end())
+    {
+        return cacheIt->second;
+    }
+
+    const std::string& path = GetPath(handle);
+    if (path.empty())
+    {
+        return nullptr;
     }
 
     auto model = std::make_shared<Model>();
-    model->SetSourcePath(path);
+    model->SetHandle(handle);
 
     std::vector<std::shared_ptr<Animation>> animations;
     auto skinnedMesh = ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), path, &animations);
@@ -112,11 +147,31 @@ std::shared_ptr<Model> ResourceManager::GetOrLoadModel(const std::string& path)
         auto staticMesh = ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), path);
         if (!staticMesh)
         {
-            return nullptr; // 둘 다 실패
+            return nullptr;
         }
         model->SetStaticMesh(staticMesh);
     }
 
-    mModelCache[path] = model;
+    mModelCache[handle.GetId()] = model;
     return model;
+}
+//나중에 파일 rename 감지(Content Browser에서 F2로 이름 바꾸기 등)를 만들면 ResourceManager::RemapAsset() 한 번만 호출
+void ResourceManager::RemapAsset(AssetHandle handle, const std::string& newPath)
+{
+    if (!handle.IsValid())
+    {
+        return;
+    }
+
+    // 이전 경로 매핑 제거
+    auto oldPathIt = mIdToPath.find(handle.GetId());
+    if (oldPathIt != mIdToPath.end())
+    {
+        mPathToId.erase(oldPathIt->second);
+    }
+
+    mIdToPath[handle.GetId()] = newPath;
+    mPathToId[newPath] = handle.GetId();
+
+    mModelCache.erase(handle.GetId()); // 다음 GetOrLoadModel 호출 시 새 경로로 다시 로드
 }

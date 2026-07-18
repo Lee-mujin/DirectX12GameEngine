@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 
-bool SceneSerializer::Save(Scene& scene, const std::string& path)
+bool SceneSerializer::Save(Scene& scene, ResourceManager& resourceManager, const std::string& path)
 {
     std::ofstream file(path);
     if (!file.is_open())
@@ -18,10 +18,13 @@ bool SceneSerializer::Save(Scene& scene, const std::string& path)
 
     for (auto& obj : scene.GetGameObjects())
     {
-        if (obj->GetSourceAssetPath().empty())
+        AssetHandle handle = obj->GetSourceAssetHandle();
+        if (!handle.IsValid())
         {
-            continue; // 프리미티브(큐브, 카메라 등)는 저장 대상 아님
+            continue;
         }
+
+        const std::string& assetPath = resourceManager.GetPath(handle);
 
         Transform& t = obj->GetTransform();
         Vector3 pos = t.GetPosition();
@@ -30,7 +33,7 @@ bool SceneSerializer::Save(Scene& scene, const std::string& path)
 
         file << "GameObject\n";
         file << "Name " << obj->GetName() << "\n";
-        file << "AssetPath " << obj->GetSourceAssetPath() << "\n";
+        file << "AssetPath " << assetPath << "\n";
         file << "Position " << pos.X << " " << pos.Y << " " << pos.Z << "\n";
         file << "Rotation " << rot.X << " " << rot.Y << " " << rot.Z << "\n";
         file << "Scale " << scale.X << " " << scale.Y << " " << scale.Z << "\n";
@@ -40,7 +43,7 @@ bool SceneSerializer::Save(Scene& scene, const std::string& path)
     return true;
 }
 
-bool SceneSerializer::Load(Scene& scene, Application& app, const std::string& path)
+bool SceneSerializer::Load(Scene& scene, Application& app, ResourceManager& resourceManager, const std::string& path)
 {
     std::ifstream file(path);
     if (!file.is_open())
@@ -48,10 +51,9 @@ bool SceneSerializer::Load(Scene& scene, Application& app, const std::string& pa
         return false;
     }
 
-    scene.ClearAssetObjects(); // 먼저 기존 에셋 오브젝트 전부 제거
+    scene.ClearAssetObjects();
 
-    std::string line;
-    std::string name, assetPath;
+    std::string line, name, assetPath;
     Vector3 pos, rot, scale(1.0f, 1.0f, 1.0f);
 
     while (std::getline(file, line))
@@ -62,36 +64,22 @@ bool SceneSerializer::Load(Scene& scene, Application& app, const std::string& pa
 
         if (token == "GameObject")
         {
-            name.clear();
-            assetPath.clear();
-            pos = Vector3::Zero;
-            rot = Vector3::Zero;
-            scale = Vector3::One;
+            name.clear(); assetPath.clear();
+            pos = Vector3::Zero; rot = Vector3::Zero; scale = Vector3::One;
         }
         else if (token == "Name")
         {
             std::getline(ss, name);
             if (!name.empty() && name[0] == ' ') name.erase(0, 1);
         }
-        else if (token == "AssetPath")
-        {
-            ss >> assetPath;
-        }
-        else if (token == "Position")
-        {
-            ss >> pos.X >> pos.Y >> pos.Z;
-        }
-        else if (token == "Rotation")
-        {
-            ss >> rot.X >> rot.Y >> rot.Z;
-        }
-        else if (token == "Scale")
-        {
-            ss >> scale.X >> scale.Y >> scale.Z;
-        }
+        else if (token == "AssetPath") { ss >> assetPath; }
+        else if (token == "Position") { ss >> pos.X >> pos.Y >> pos.Z; }
+        else if (token == "Rotation") { ss >> rot.X >> rot.Y >> rot.Z; }
+        else if (token == "Scale") { ss >> scale.X >> scale.Y >> scale.Z; }
         else if (token == "EndGameObject")
         {
-            auto obj = app.SpawnAssetIntoScene(assetPath);
+            AssetHandle handle = resourceManager.GetOrCreateHandle(assetPath); // 경로 -> 핸들 변환은 여기 한 곳
+            auto obj = app.SpawnAssetIntoScene(handle);
             if (obj)
             {
                 obj->SetName(name);

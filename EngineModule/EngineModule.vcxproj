@@ -161,6 +161,7 @@
     <ClInclude Include="Animation.h" />
     <ClInclude Include="AnimatorComponent.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="AssetHandle.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Component.h" />
@@ -226,6 +227,7 @@
     <ClCompile Include="Animation.cpp" />
     <ClCompile Include="AnimatorComponent.cpp" />
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="AssetHandle.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraComponent.cpp" />
     <ClCompile Include="CgltfImpl.cpp">

@@ -40,7 +40,7 @@ void Scene::ClearAssetObjects()
         std::remove_if(mObjects.begin(), mObjects.end(),
             [](const std::shared_ptr<GameObject>& obj)
             {
-                return !obj->GetSourceAssetPath().empty();
+                return obj->GetSourceAssetHandle().IsValid();
             }),
         mObjects.end());
 }

@@ -180,6 +180,9 @@
     <ClInclude Include="SceneSerializer.h">
       <Filter>Scene\h</Filter>
     </ClInclude>
+    <ClInclude Include="AssetHandle.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -295,6 +298,9 @@
     </ClCompile>
     <ClCompile Include="SceneSerializer.cpp">
       <Filter>Scene\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetHandle.cpp">
+      <Filter>Resource\cpp</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -7,6 +7,6 @@ class Application;
 class SceneSerializer
 {
 public:
-    static bool Save(Scene& scene, const std::string& path);
-    static bool Load(Scene& scene, Application& app, const std::string& path);
+    static bool Save(Scene& scene, ResourceManager& resourceManager, const std::string& path);
+    static bool Load(Scene& scene, Application& app, ResourceManager& resourceManager, const std::string& path);
 };

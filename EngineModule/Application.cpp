@@ -57,12 +57,14 @@ bool Application::Initialize(HINSTANCE hInstance)
 
     mContentBrowser.Initialize("Assets", [this](const std::filesystem::path& path)
         {
-            SpawnAssetIntoScene(path);
+            AssetHandle handle = mResourceManager.GetOrCreateHandle(path.string());
+            SpawnAssetIntoScene(handle);
         });
 
     mHierarchy.SetOnAssetDropped([this](const std::filesystem::path& path)
         {
-            SpawnAssetIntoScene(path);
+            AssetHandle handle = mResourceManager.GetOrCreateHandle(path.string());
+            SpawnAssetIntoScene(handle);
         });
 
     //DirectionalLight
@@ -94,30 +96,26 @@ bool Application::Initialize(HINSTANCE hInstance)
     return true;
 }
 
-std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(const std::filesystem::path& assetPath)
+std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
 {
     auto scene = mSceneManager.GetCurrentScene();
-    if (!scene)
+    if (!scene || !handle.IsValid())
     {
         return nullptr;
     }
 
-    std::string ext = assetPath.extension().string();
-    if (ext != ".glb" && ext != ".gltf")
-    {
-        return nullptr;
-    }
-
-    std::string pathStr = assetPath.string();
-    auto model = mResourceManager.GetOrLoadModel(pathStr);
+    auto model = mResourceManager.GetOrLoadModel(handle);
     if (!model)
     {
         return nullptr;
     }
 
+    const std::string& path = mResourceManager.GetPath(handle);
+    std::filesystem::path fsPath(path);
+
     auto obj = std::make_shared<GameObject>();
-    obj->SetName(assetPath.stem().string());
-    obj->SetSourceAssetPath(pathStr);
+    obj->SetName(fsPath.stem().string());
+    obj->SetSourceAssetHandle(handle);
 
     MeshRenderer* renderer = obj->AddComponent<MeshRenderer>();
     renderer->SetMesh(model->GetMesh());
@@ -137,7 +135,7 @@ std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(const std::filesyst
         obj->GetTransform().SetRotation(Vector3(90.0f, 0.0f, 0.0f));
     }
 
-    mSceneManager.GetCurrentScene()->AddGameObject(obj);
+    scene->AddGameObject(obj);
     return obj;
 }
 
@@ -158,14 +156,14 @@ void Application::Run()
                 {
                     if (auto scene = mSceneManager.GetCurrentScene())
                     {
-                        SceneSerializer::Save(*scene, "Assets/Scenes/scene.txt");
+                        SceneSerializer::Save(*scene, mResourceManager, "Assets/Scenes/scene.txt");
                     }
                 }
                 if (ImGui::MenuItem("Load Scene"))
                 {
                     if (auto scene = mSceneManager.GetCurrentScene())
                     {
-                        SceneSerializer::Load(*scene, *this, "Assets/Scenes/scene.txt");
+                        SceneSerializer::Load(*scene, *this, mResourceManager, "Assets/Scenes/scene.txt");
                     }
                 }
                 ImGui::EndMenu();

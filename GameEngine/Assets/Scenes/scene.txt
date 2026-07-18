@@ -1,0 +1,14 @@
+GameObject
+Name Cha
+AssetPath Assets\Models\Cha.glb
+Position 0 0 0
+Rotation 90 0 0
+Scale 0.01 0.01 0.01
+EndGameObject
+GameObject
+Name Char2
+AssetPath Assets\Models\Char2.glb
+Position 0 0 0
+Rotation 90 0 0
+Scale 0.01 0.01 0.01
+EndGameObject

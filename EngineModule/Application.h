@@ -13,6 +13,7 @@
 #include "Light.h"
 #include "ContentBrowser.h"
 #include "Gizmo.h"
+#include "AssetHandle.h"
 
 class Application
 {
@@ -20,7 +21,7 @@ public:
     bool Initialize(HINSTANCE hInstance);
     void Run();
     void Shutdown();
-    std::shared_ptr<GameObject> SpawnAssetIntoScene(const std::filesystem::path& assetPath);
+    std::shared_ptr<GameObject> SpawnAssetIntoScene(AssetHandle handle);
 private:
     Window mWindow;
     Timer mTimer;
