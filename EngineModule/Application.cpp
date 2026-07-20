@@ -10,31 +10,30 @@
 
 bool Application::Initialize(HINSTANCE hInstance)
 {
-    if (!mWindow.Create(hInstance, 1280, 720)) return false; //창
-    mWindow.SetInput(&mInput); //키/마우스 입력
+    if (!mWindow.Create(hInstance, 1280, 720)) return false;
+    mWindow.SetInput(&mInput);
 
     if (!mRenderer.Initialize(mWindow.GetHWND(), mWindow.GetWidth(), mWindow.GetHeight())) return false;
 
+    if (!mUploadContext.Initialize(mRenderer.GetDevice(), mRenderer.GetCommandQueue())) return false;
+    mTextureLoader.Initialize(mRenderer.GetDevice(), mRenderer.GetSrvAllocatorPtr(), &mUploadContext);
+
     D3D12_CPU_DESCRIPTOR_HANDLE fontCpuHandle;
     D3D12_GPU_DESCRIPTOR_HANDLE fontGpuHandle;
-    mRenderer.AllocateSrvSlot(fontCpuHandle, fontGpuHandle); //descriptor heap 슬롯 할당
+    mRenderer.AllocateSrvSlot(fontCpuHandle, fontGpuHandle);
 
     mImGuiLayer.Initialize(
         mWindow.GetHWND(), mRenderer.GetDevice(), mRenderer.GetCommandQueue(),
         D3D12Renderer::GetFrameCount(), DXGI_FORMAT_R8G8B8A8_UNORM,
-        mRenderer.GetSrvHeap(), fontCpuHandle, fontGpuHandle);
+        mRenderer.GetSrvAllocator().GetHeap(), fontCpuHandle, fontGpuHandle);
 
-    //mRenderer로부터 핸들과 디바이스 정보를 넘겨 ImGui를 초기화해 DX12에서 UI를 그림
     mRenderer.SetImGuiLayer(&mImGuiLayer);
-
-    mResourceManager.Initialize(&mRenderer); //GUI
+    mResourceManager.Initialize(&mRenderer, &mTextureLoader);
     mSceneManager.Initialize();
-    ////Scene 생성
-    float aspect = static_cast<float>(mWindow.GetWidth()) / static_cast<float>(mWindow.GetHeight());
 
+    float aspect = static_cast<float>(mWindow.GetWidth()) / static_cast<float>(mWindow.GetHeight());
     auto scene = std::make_shared<Scene>();
 
-	//GameObject에 CameraComponent를 추가해 카메라를 생성하고 Scene에 추가
     auto cameraObject = std::make_shared<GameObject>();
     cameraObject->SetName("Camera");
     CameraComponent* cameraComponent = cameraObject->AddComponent<CameraComponent>();
@@ -42,16 +41,19 @@ bool Application::Initialize(HINSTANCE hInstance)
     scene->AddGameObject(cameraObject);
     scene->SetMainCamera(cameraComponent);
 
-    //MeshRenderer 컴포넌트를 붙여서 큐브를 생성
     auto cube = std::make_shared<GameObject>();
     cube->SetName("Cube");
     MeshRenderer* meshRenderer = cube->AddComponent<MeshRenderer>();
     meshRenderer->SetMesh(mResourceManager.GetCubeMesh());
-    //머테리얼로 텍스처를 입힘
+
     auto material = std::make_shared<Material>();
-    material->SetTexture(mResourceManager.LoadTexture(L"Assets/Textures/Box.jpg"));
+    //분리된 mTextureLoader를 통해 텍스처를 기록
+    material->SetTexture(mTextureLoader.LoadTextureFromFile(L"Assets/Textures/Box.jpg"));
+
+    mUploadContext.Flush();
+
     meshRenderer->SetMaterial(material);
-    //회전추가
+
     cube->AddComponent<RotatorComponent>(90.0f);
     scene->AddGameObject(cube);
 
@@ -67,10 +69,8 @@ bool Application::Initialize(HINSTANCE hInstance)
             SpawnAssetIntoScene(handle);
         });
 
-    //DirectionalLight
     scene->SetMainLight(DirectionalLight{ Vector3(0.3f, -0.8f, 0.5f), Vector3(1.0f, 1.0f, 1.0f), 1.0f });
 
-    //PointLight
     PointLight pointLight;
     pointLight.Position = Vector3(0.0f, 1.0f, -2.0f);
     pointLight.Color = Vector3(1.0f, 0.6f, 0.3f);
@@ -79,7 +79,6 @@ bool Application::Initialize(HINSTANCE hInstance)
     pointLight.Enabled = true;
     scene->SetPointLight(pointLight);
 
-    //SpotLight
     SpotLight spotLight;
     spotLight.Position = Vector3(0.0f, 3.0f, -3.0f);
     spotLight.Direction = Vector3(0.0f, -1.0f, 0.5f).GetNormalize();
@@ -92,23 +91,17 @@ bool Application::Initialize(HINSTANCE hInstance)
     scene->SetSpotLight(spotLight);
 
     mSceneManager.ChangeScene(scene);
-    
+
     return true;
 }
 
 std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
 {
     auto scene = mSceneManager.GetCurrentScene();
-    if (!scene || !handle.IsValid())
-    {
-        return nullptr;
-    }
+    if (!scene || !handle.IsValid()) return nullptr;
 
     auto model = mResourceManager.GetOrLoadModel(handle);
-    if (!model)
-    {
-        return nullptr;
-    }
+    if (!model) return nullptr;
 
     const std::string& path = mResourceManager.GetPath(handle);
     std::filesystem::path fsPath(path);
@@ -143,7 +136,7 @@ void Application::Run()
 {
     while (mWindow.ProcessMessage())
     {
-        mTimer.Tick(); //매 프레임마다 시간 갱신
+        mTimer.Tick();
         float deltaTime = mTimer.DeltaTime();
 
         mImGuiLayer.NewFrame();
@@ -185,9 +178,41 @@ void Application::Run()
         mInspector.Draw(mEditorState);
         mContentBrowser.Draw();
 
-        mSceneManager.Update(&mInput, deltaTime); //로직 업뎃
-        mSceneManager.Render(mRenderer); //렌더러를 이용해 씬
+        float newWidth, newHeight, posX, posY;
+        mViewport.Draw(mRenderer.GetViewportSrvHandle(), newWidth, newHeight, posX, posY);
 
+        if (newWidth > 0 && newHeight > 0 &&
+            (static_cast<UINT>(newWidth) != static_cast<UINT>(mViewportWidth) ||
+                static_cast<UINT>(newHeight) != static_cast<UINT>(mViewportHeight)))
+        {
+            mViewportWidth = newWidth;
+            mViewportHeight = newHeight;
+            mRenderer.ResizeViewport(static_cast<UINT>(newWidth), static_cast<UINT>(newHeight));
+        }
+        mViewportPosX = posX;
+        mViewportPosY = posY;
+
+        mSceneManager.Update(&mInput, deltaTime);
+
+        if (scene)
+        {
+            if (CameraComponent* camComp = scene->GetMainCamera())
+            {
+                mRenderer.BeginFrame(camComp->GetCamera(), scene->GetMainLight(), scene->GetPointLight(), scene->GetSpotLight());
+
+                for (auto& obj : scene->GetGameObjects())
+                {
+                    if (MeshRenderer* mr = obj->GetComponent<MeshRenderer>())
+                    {
+                        mr->Render(mRenderer);
+                    }
+                }
+
+                mRenderer.TransitionToSwapChain();
+            }
+        }
+
+        mRenderer.EndFrame();
         mInput.Update();
     }
 }
@@ -195,6 +220,7 @@ void Application::Run()
 void Application::Shutdown()
 {
     mImGuiLayer.Shutdown();
+    mUploadContext.Shutdown();
     mRenderer.Cleanup();
     mWindow.Destroy();
 }

@@ -166,6 +166,7 @@
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ContentBrowser.h" />
+    <ClInclude Include="DescriptorAllocator.h" />
     <ClInclude Include="DirectionalLight.h" />
     <ClInclude Include="EditorState.h" />
     <ClInclude Include="FrameResource.h" />
@@ -179,6 +180,7 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="PointLight.h" />
+    <ClInclude Include="RenderTarget.h" />
     <ClInclude Include="ResourceManager.h" />
     <ClInclude Include="RotatorComponent.h" />
     <ClInclude Include="D3D12Renderer.h" />
@@ -195,8 +197,11 @@
     <ClInclude Include="SkinnedMesh.h" />
     <ClInclude Include="SpotLight.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="TextureLoader.h" />
     <ClInclude Include="Timer.h" />
+    <ClInclude Include="UploadContext.h" />
     <ClInclude Include="Vertex.h" />
+    <ClInclude Include="Viewport.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
@@ -234,6 +239,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ContentBrowser.cpp" />
+    <ClCompile Include="DescriptorAllocator.cpp" />
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="Gizmo.cpp" />
     <ClCompile Include="Hierarchy.cpp" />
@@ -243,9 +249,13 @@
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
+    <ClCompile Include="RendererDraw.cpp" />
+    <ClCompile Include="RendererFrame.cpp" />
+    <ClCompile Include="RendererViewport.cpp" />
+    <ClCompile Include="RenderTarget.cpp" />
     <ClCompile Include="ResourceManager.cpp" />
     <ClCompile Include="RotatorComponent.cpp" />
-    <ClCompile Include="D3D12Renderer.cpp" />
+    <ClCompile Include="RendererInit.cpp" />
     <ClCompile Include="EngineModule.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="Input.cpp" />
@@ -260,7 +270,10 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="TextureLoader.cpp" />
     <ClCompile Include="Timer.cpp" />
+    <ClCompile Include="UploadContext.cpp" />
+    <ClCompile Include="Viewport.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>

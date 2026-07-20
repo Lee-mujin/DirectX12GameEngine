@@ -8,12 +8,15 @@
 class Mesh;
 class Texture;
 class D3D12Renderer;
+class TextureLoader;
 class Model;
 
 class ResourceManager
 {
 public:
-    void Initialize(D3D12Renderer* renderer);
+    //초기화 시 렌더러와 함께 텍스처 로더를 인자로 받도록 변경
+    void Initialize(D3D12Renderer* renderer, TextureLoader* textureLoader);
+
     std::shared_ptr<Mesh> GetCubeMesh();
     std::shared_ptr<Texture> LoadTexture(const std::wstring& path);
     std::shared_ptr<Texture> GetDefaultWhiteTexture();
@@ -32,6 +35,8 @@ public:
 
 private:
     D3D12Renderer* mRenderer = nullptr;
+    TextureLoader* mTextureLoader = nullptr; //주입받은 텍스처 로더를 보관할 멤버 변수
+
     std::shared_ptr<Mesh> mCubeMesh;
     std::shared_ptr<Texture> mDefaultWhiteTexture;
 

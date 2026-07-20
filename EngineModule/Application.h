@@ -14,6 +14,9 @@
 #include "ContentBrowser.h"
 #include "Gizmo.h"
 #include "AssetHandle.h"
+#include "Viewport.h"
+#include "UploadContext.h"
+#include "TextureLoader.h"
 
 class Application
 {
@@ -36,4 +39,12 @@ private:
 	Light mLight;
     ContentBrowser mContentBrowser;
     Gizmo mGizmoPanel;
+    UploadContext mUploadContext;
+    TextureLoader mTextureLoader;
+
+    Viewport mViewport;
+    float mViewportWidth = 1280.0f;
+    float mViewportHeight = 720.0f;
+    float mViewportPosX = 0.0f;
+    float mViewportPosY = 0.0f;
 };

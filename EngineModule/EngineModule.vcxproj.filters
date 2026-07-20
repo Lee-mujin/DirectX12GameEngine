@@ -183,6 +183,21 @@
     <ClInclude Include="AssetHandle.h">
       <Filter>Resource\h</Filter>
     </ClInclude>
+    <ClInclude Include="RenderTarget.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Viewport.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="DescriptorAllocator.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="UploadContext.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureLoader.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -206,7 +221,7 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Graphics\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="D3D12Renderer.cpp">
+    <ClCompile Include="RendererInit.cpp">
       <Filter>Graphics\cpp</Filter>
     </ClCompile>
     <ClCompile Include="CameraComponent.cpp">
@@ -300,6 +315,30 @@
       <Filter>Scene\cpp</Filter>
     </ClCompile>
     <ClCompile Include="AssetHandle.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderTarget.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="Viewport.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererFrame.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererDraw.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererViewport.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="DescriptorAllocator.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="UploadContext.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureLoader.cpp">
       <Filter>Resource\cpp</Filter>
     </ClCompile>
   </ItemGroup>

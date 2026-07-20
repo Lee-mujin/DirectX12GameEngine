@@ -1,4 +1,3 @@
-// ModelLoader.cpp
 #include "pch.h"
 #include "ModelLoader.h"
 #include "Mesh.h"

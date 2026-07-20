@@ -2,6 +2,7 @@
 #include "ResourceManager.h"
 #include "Texture.h"
 #include "D3D12Renderer.h"
+#include "TextureLoader.h"
 #include "ModelLoader.h"
 #include "SkinnedMesh.h"
 #include "Skeleton.h"
@@ -10,9 +11,11 @@
 
 const std::string ResourceManager::kEmptyPath = "";
 
-void ResourceManager::Initialize(D3D12Renderer* renderer)
+//TextureLoader 포인터도 함께 주입받아 저장
+void ResourceManager::Initialize(D3D12Renderer* renderer, TextureLoader* textureLoader)
 {
     mRenderer = renderer;
+    mTextureLoader = textureLoader;
 }
 
 std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
@@ -78,25 +81,26 @@ std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
 
 std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::wstring& path)
 {
-    return mRenderer->LoadTextureFromFile(path);
+    //주입받은 텍스처로더로부터 에셋을 불러옴
+    return mTextureLoader->LoadTextureFromFile(path);
 }
 
 std::shared_ptr<Texture> ResourceManager::GetDefaultWhiteTexture()
 {
     if (!mDefaultWhiteTexture)
     {
-        mDefaultWhiteTexture = mRenderer->CreateSolidColorTexture(255, 255, 255, 255);
+        //텍스처를 생성
+        mDefaultWhiteTexture = mTextureLoader->CreateSolidColorTexture(255, 255, 255, 255);
     }
     return mDefaultWhiteTexture;
 }
-//문자열 경로는 ContentBrowser와 ResourceManager::GetOrCreateHandle/GetPath 두 지점에서만
-//GameObject, Model, Scene, 저장 파일의 AssetPath 필드는 여전히 텍스트지만 로드 시 즉시 핸들로 변환
+
 AssetHandle ResourceManager::GetOrCreateHandle(const std::string& path)
 {
     auto it = mPathToId.find(path);
     if (it != mPathToId.end())
     {
-        return AssetHandle(it->second); // friend라 private 생성자 접근 가능
+        return AssetHandle(it->second);
     }
 
     uint32_t id = mNextHandleId++;
@@ -155,7 +159,7 @@ std::shared_ptr<Model> ResourceManager::GetOrLoadModel(AssetHandle handle)
     mModelCache[handle.GetId()] = model;
     return model;
 }
-//나중에 파일 rename 감지(Content Browser에서 F2로 이름 바꾸기 등)를 만들면 ResourceManager::RemapAsset() 한 번만 호출
+
 void ResourceManager::RemapAsset(AssetHandle handle, const std::string& newPath)
 {
     if (!handle.IsValid())
@@ -163,7 +167,6 @@ void ResourceManager::RemapAsset(AssetHandle handle, const std::string& newPath)
         return;
     }
 
-    // 이전 경로 매핑 제거
     auto oldPathIt = mIdToPath.find(handle.GetId());
     if (oldPathIt != mIdToPath.end())
     {
@@ -173,5 +176,5 @@ void ResourceManager::RemapAsset(AssetHandle handle, const std::string& newPath)
     mIdToPath[handle.GetId()] = newPath;
     mPathToId[newPath] = handle.GetId();
 
-    mModelCache.erase(handle.GetId()); // 다음 GetOrLoadModel 호출 시 새 경로로 다시 로드
+    mModelCache.erase(handle.GetId());
 }
