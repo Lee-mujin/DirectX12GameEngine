@@ -14,6 +14,15 @@ void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material,
 {
     if (mObjectDrawIndex >= kMaxObjectsPerFrame) return;
 
+    //렌더링 직전 Mesh 버퍼(Vertex/Index)를 COMMON -> VERTEX/INDEX_BUFFER 로 상태 전환
+    const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
+
+    //Material에 텍스처가 있으면 COMMON -> PIXEL_SHADER_RESOURCE 로 상태 전환
+    if (auto texture = material.GetTexture())
+    {
+        const_cast<Texture&>(*texture).TransitionToRenderState(mCommandList.Get());
+    }
+
     mCommandList->SetPipelineState(pso);
 
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];

@@ -11,14 +11,12 @@ void D3D12Renderer::InitializeViewport(UINT width, UINT height)
 
     if (!mIsViewportSrvAllocated)
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpu;
-        D3D12_GPU_DESCRIPTOR_HANDLE srvGpu;
-
-        // mSrvAllocator의 Allocate 호출
-        if (mSrvAllocator.Allocate(srvCpu, srvGpu))
+        //단일 DescriptorHandle 객체로 할당
+        DescriptorHandle srvHandle = mSrvAllocator.Allocate();
+        if (srvHandle)
         {
-            mViewportSrvCpuHandle = srvCpu;
-            mViewportSrvGpuHandle = srvGpu;
+            mViewportSrvCpuHandle = srvHandle.CpuHandle;
+            mViewportSrvGpuHandle = srvHandle.GpuHandle;
             mIsViewportSrvAllocated = true;
         }
     }
@@ -43,7 +41,7 @@ void D3D12Renderer::TransitionToSwapChain()
 
     TransitionResource(mBackBuffers[mFrameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    // ✨ 최종 백버퍼 RTV 핸들도 할당자 오프셋 구조에 맞추어 역산 대입합니다.
+    //백버퍼 RTV 핸들
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(mRtvAllocator.GetHeap()->GetCPUDescriptorHandleForHeapStart(), mFrameIndex, mRtvAllocator.GetDescriptorSize());
     mCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 

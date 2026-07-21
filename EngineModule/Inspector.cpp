@@ -8,7 +8,7 @@
 #include "Animation.h"
 #include "ResourceManager.h" 
 
-void Inspector::Draw(EditorState& editorState)
+void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
 {
     ImGui::Begin("Inspector");
 
@@ -60,10 +60,22 @@ void Inspector::Draw(EditorState& editorState)
             auto material = meshRenderer->GetMaterial();
             if (material)
             {
-                Vector3 color = material->GetColor();
-                if (ImGui::ColorEdit3("Albedo Color", &color.X))
+                Vector3 baseColor = material->GetBaseColor();
+                if (ImGui::ColorEdit3("Base Color", &baseColor.X))
                 {
-                    material->SetColor(color);
+                    material->SetBaseColor(baseColor);
+                }
+
+                float metallic = material->GetMetallic();
+                if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f))
+                {
+                    material->SetMetallic(metallic);
+                }
+
+                float roughness = material->GetRoughness();
+                if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f))
+                {
+                    material->SetRoughness(roughness);
                 }
 
                 float shininess = material->GetShininess();
@@ -72,20 +84,18 @@ void Inspector::Draw(EditorState& editorState)
                     material->SetShininess(shininess);
                 }
 
-                auto texture = material->GetTexture();
-
+                auto texture = material->GetBaseColorTexture();
                 if (texture)
                 {
-                    ImGui::Text("Texture:");
+                    ImGui::Text("Base Color Texture:");
                     ImGui::Image((ImTextureID)texture->GetSrvHandle().ptr, ImVec2(64, 64));
                 }
                 else
                 {
-                    ImGui::Text("Texture: (None)");
+                    ImGui::Text("Base Color Texture: (None)");
                 }
 
-                // 텍스처 변경 파일 다이얼로그 연동 활성화
-                if (ImGui::Button("Change Texture..."))
+                if (ImGui::Button("Change Base Color Texture..."))
                 {
                     wchar_t filePath[MAX_PATH] = {};
                     OPENFILENAMEW ofn = {};
@@ -97,10 +107,18 @@ void Inspector::Draw(EditorState& editorState)
 
                     if (GetOpenFileNameW(&ofn))
                     {
-                        // 런타임 텍스처 교체 연동 (자체 렌더러/리소스 매니저 호출 설계 반영)
-                        // material->SetTexture(ResourceManager::GetInstance().LoadTexture(filePath));
+                        auto newTexture = resourceManager.LoadTexture(filePath);
+                        if (newTexture)
+                        {
+                            material->SetBaseColorTexture(newTexture);
+                        }
                     }
                 }
+
+                ImGui::Separator();
+
+                auto normalTexture = material->GetNormalTexture();
+                ImGui::Text("Normal Map: %s", normalTexture ? "Loaded" : "(None) - 셰이더 미적용, 데이터만 보관");
             }
             else
             {

@@ -1,79 +1,59 @@
 #include "pch.h"
 #include "DescriptorAllocator.h"
 
-bool DescriptorAllocator::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT maxCount, bool shaderVisible)
+bool DescriptorAllocator::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT capacity, bool shaderVisible)
 {
-    mMaxCount = maxCount;
-    mDescriptorSize = device->GetDescriptorHandleIncrementSize(type);
+    mCapacity = capacity;
+    mShaderVisible = shaderVisible;
+    mAllocatedSlots.assign(capacity, false);
 
     D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-    desc.NumDescriptors = mMaxCount;
+    desc.NumDescriptors = capacity;
     desc.Type = type;
     desc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
-    if (FAILED(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mHeap))))
-    {
-        return false;
-    }
+    if (FAILED(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&mHeap)))) return false;
 
-    mHeapStartCpu = mHeap->GetCPUDescriptorHandleForHeapStart();
-    if (shaderVisible)
+    mDescriptorSize = device->GetDescriptorHandleIncrementSize(type);
+    mCpuBaseHandle = mHeap->GetCPUDescriptorHandleForHeapStart();
+
+    if (mShaderVisible)
     {
-        mHeapStartGpu = mHeap->GetGPUDescriptorHandleForHeapStart();
+        mGpuBaseHandle = mHeap->GetGPUDescriptorHandleForHeapStart();
     }
 
     return true;
 }
 
-bool DescriptorAllocator::Allocate(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu)
+DescriptorHandle DescriptorAllocator::Allocate()
 {
-    UINT allocatedIndex = 0;
+    DescriptorHandle handle;
 
-    //반환된 슬롯이 있다면 먼저 재사용
-    if (!mFreeIndices.empty())
+    for (UINT i = 0; i < mCapacity; ++i)
     {
-        allocatedIndex = mFreeIndices.back();
-        mFreeIndices.pop_back();
-    }
-    //없다면 순차적 오프셋 할당
-    else
-    {
-        if (mUsedCount >= mMaxCount)
+        if (!mAllocatedSlots[i])
         {
-            return false;
+            mAllocatedSlots[i] = true;
+
+            handle.Index = i;
+            handle.CpuHandle.ptr = mCpuBaseHandle.ptr + static_cast<SIZE_T>(i) * mDescriptorSize;
+
+            if (mShaderVisible)
+            {
+                handle.GpuHandle.ptr = mGpuBaseHandle.ptr + static_cast<UINT64>(i) * mDescriptorSize;
+            }
+            return handle;
         }
-        allocatedIndex = mUsedCount;
-        mUsedCount++;
     }
 
-    outCpu.ptr = mHeapStartCpu.ptr + (static_cast<SIZE_T>(allocatedIndex) * mDescriptorSize);
-    if (mHeapStartGpu.ptr != 0)
+    return handle;
+}
+
+void DescriptorAllocator::Free(DescriptorHandle& handle)
+{
+    if (handle.Index < mCapacity)
     {
-        outGpu.ptr = mHeapStartGpu.ptr + (allocatedIndex * mDescriptorSize);
+        mAllocatedSlots[handle.Index] = false;
+        handle.Reset();
     }
-    else
-    {
-        outGpu.ptr = 0;
-    }
-
-    return true;
-}
-
-void DescriptorAllocator::Free(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
-{
-    //핸들 주소 연산을 통해 몇 번째 인덱스 슬롯인지 역산하여 FreeList에 삽입
-    UINT index = GetIndexFromHandle(cpuHandle);
-    mFreeIndices.push_back(index);
-}
-
-UINT DescriptorAllocator::GetIndexFromHandle(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
-{
-    return static_cast<UINT>((cpuHandle.ptr - mHeapStartCpu.ptr) / mDescriptorSize);
-}
-
-void DescriptorAllocator::Shutdown()
-{
-    mHeap.Reset();
-    mFreeIndices.clear();
-    mUsedCount = 0;
 }

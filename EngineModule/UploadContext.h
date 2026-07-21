@@ -10,10 +10,9 @@ public:
     UploadContext() = default;
     ~UploadContext() = default;
 
-    bool Initialize(ID3D12Device* device, ID3D12CommandQueue* queue);
+    bool Initialize(ID3D12Device* device);
     void Shutdown();
 
-    //uploadFunc를 기록하고 명령을 큐에 제출, GPU를 안기다림
     template<typename Func>
     void Execute(Func&& uploadFunc)
     {
@@ -24,17 +23,20 @@ public:
 
         mCommandList->Close();
         ID3D12CommandList* lists[] = { mCommandList.Get() };
-        mCommandQueue->ExecuteCommandLists(1, lists);
+        mCopyQueue->ExecuteCommandLists(1, lists);
     }
 
-    //누적된 대량의 GPU 복사 작업이 끝난 후, 단 한 번만 명시적으로 대기할 때 호출
+    // CPU에서 GPU 작업 완료까지 블로킹 대기
     void Flush();
 
+    // Graphics Queue가 Copy Queue의 완료를 GPU 상에서 대기하도록 지시
+    void SyncWithGraphicsQueue(ID3D12CommandQueue* graphicsQueue);
+
 private:
+    ComPtr<ID3D12CommandQueue> mCopyQueue; //전용 Copy Queue
     ComPtr<ID3D12CommandAllocator> mAllocator;
     ComPtr<ID3D12GraphicsCommandList> mCommandList;
     ComPtr<ID3D12Fence> mFence;
     HANDLE mFenceEvent = nullptr;
     UINT64 mFenceValue = 0;
-    ID3D12CommandQueue* mCommandQueue = nullptr;
 };

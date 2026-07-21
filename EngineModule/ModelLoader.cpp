@@ -6,6 +6,7 @@
 #include "SkinnedMesh.h"
 #include "Skeleton.h"
 #include "Animation.h"
+#include "UploadContext.h" //추가
 #include <vector>
 
 namespace
@@ -20,7 +21,7 @@ namespace
     }
 }
 
-std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, const std::string& path)
+std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, UploadContext* uploadContext, const std::string& path)
 {
     cgltf_options options = {};
     cgltf_data* data = nullptr;
@@ -123,12 +124,13 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, const st
     cgltf_free(data);
 
     auto result = std::make_shared<Mesh>();
-    result->Create(device, vertices, indices);
+    //uploadContext 인자 전달
+    result->Create(device, uploadContext, vertices, indices);
     return result;
 }
 
 std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
-    ID3D12Device* device, const std::string& path,
+    ID3D12Device* device, UploadContext* uploadContext, const std::string& path,
     std::vector<std::shared_ptr<Animation>>* outAnimations)
 {
     if (outAnimations)
@@ -159,7 +161,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
     const cgltf_primitive& primitive = data->meshes[0].primitives[0];
     const cgltf_skin& skin = data->skins[0];
 
-    // 1) Skeleton 구성
+    //Skeleton 구성
     auto skeleton = std::make_shared<Skeleton>();
     skeleton->Bones.resize(skin.joints_count);
 
@@ -180,9 +182,9 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         skeleton->Bones[i].LocalBindTransform =
             Matrix4x4::Scale(scale) * Matrix4x4::Rotate(rot) * Matrix4x4::Translate(pos);
 
-        skeleton->Bones[i].BindPosition = pos;      // 추가
-        skeleton->Bones[i].BindRotation = rot;      // 추가
-        skeleton->Bones[i].BindScale = scale;       // 추가
+        skeleton->Bones[i].BindPosition = pos;
+        skeleton->Bones[i].BindRotation = rot;
+        skeleton->Bones[i].BindScale = scale;
 
         skeleton->Bones[i].ParentIndex = -1;
 
@@ -204,7 +206,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         }
     }
 
-    // 2) 정점 데이터 (기존 그대로)
+    //정점 데이터
     cgltf_accessor* positionAccessor = nullptr;
     cgltf_accessor* normalAccessor = nullptr;
     cgltf_accessor* uvAccessor = nullptr;
@@ -297,7 +299,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         }
     }
 
-    // 3) 애니메이션 - 파일에 있는 모든 클립을 파싱해서 목록으로 반환
+    //애니메이션
     if (outAnimations && data->animations_count > 0)
     {
         for (size_t a = 0; a < data->animations_count; ++a)
@@ -394,7 +396,8 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
     cgltf_free(data);
 
     auto result = std::make_shared<SkinnedMesh>();
-    result->Create(device, vertices, indices);
+    //uploadContext 인자 전달
+    result->Create(device, uploadContext, vertices, indices);
     result->SetSkeleton(skeleton);
 
     return result;

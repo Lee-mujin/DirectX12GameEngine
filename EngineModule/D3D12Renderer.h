@@ -29,11 +29,11 @@ class D3D12Renderer
 public:
     bool Initialize(HWND hwnd, UINT width, UINT height);
     void Cleanup();
-
-    bool AllocateSrvSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu)
+    DescriptorHandle AllocateSrvSlot()
     {
-        return mSrvAllocator.Allocate(outCpu, outGpu);
+        return mSrvAllocator.Allocate();
     }
+
     const DescriptorAllocator& GetSrvAllocator() const { return mSrvAllocator; }
     DescriptorAllocator* GetSrvAllocatorPtr() { return &mSrvAllocator; }
     ID3D12DescriptorHeap* GetSrvHeap() const { return mSrvAllocator.GetHeap(); }

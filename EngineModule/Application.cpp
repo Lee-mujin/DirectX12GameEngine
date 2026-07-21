@@ -15,20 +15,23 @@ bool Application::Initialize(HINSTANCE hInstance)
 
     if (!mRenderer.Initialize(mWindow.GetHWND(), mWindow.GetWidth(), mWindow.GetHeight())) return false;
 
-    if (!mUploadContext.Initialize(mRenderer.GetDevice(), mRenderer.GetCommandQueue())) return false;
+    //렌더러 CommandQueue 주입 제거 Device만 전달하여 내부 전용 CopyQueue 생성
+    if (!mUploadContext.Initialize(mRenderer.GetDevice())) return false;
+
     mTextureLoader.Initialize(mRenderer.GetDevice(), mRenderer.GetSrvAllocatorPtr(), &mUploadContext);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE fontCpuHandle;
-    D3D12_GPU_DESCRIPTOR_HANDLE fontGpuHandle;
-    mRenderer.AllocateSrvSlot(fontCpuHandle, fontGpuHandle);
+    //DescriptorHandle 단일 객체 반환 받기
+    DescriptorHandle fontHandle = mRenderer.AllocateSrvSlot();
 
     mImGuiLayer.Initialize(
         mWindow.GetHWND(), mRenderer.GetDevice(), mRenderer.GetCommandQueue(),
         D3D12Renderer::GetFrameCount(), DXGI_FORMAT_R8G8B8A8_UNORM,
-        mRenderer.GetSrvAllocator().GetHeap(), fontCpuHandle, fontGpuHandle);
+        mRenderer.GetSrvAllocator().GetHeap(), fontHandle.CpuHandle, fontHandle.GpuHandle);
 
     mRenderer.SetImGuiLayer(&mImGuiLayer);
-    mResourceManager.Initialize(&mRenderer, &mTextureLoader);
+
+    //ResourceManager에 세개 전부 전달
+    mResourceManager.Initialize(&mRenderer, &mTextureLoader, &mUploadContext);
     mSceneManager.Initialize();
 
     float aspect = static_cast<float>(mWindow.GetWidth()) / static_cast<float>(mWindow.GetHeight());
@@ -47,12 +50,12 @@ bool Application::Initialize(HINSTANCE hInstance)
     meshRenderer->SetMesh(mResourceManager.GetCubeMesh());
 
     auto material = std::make_shared<Material>();
-    //분리된 mTextureLoader를 통해 텍스처를 기록
-    material->SetTexture(mTextureLoader.LoadTextureFromFile(L"Assets/Textures/Box.jpg"));
-
-    mUploadContext.Flush();
-
+    //mTextureLoader 직접 호출 제거 -> mResourceManager를 경유
+    material->SetTexture(mResourceManager.LoadTexture(L"Assets/Textures/Box.jpg"));
     meshRenderer->SetMaterial(material);
+
+    //CPU를 멈추는 Flush 대신, Copy Queue 작업 완결 신호를 Graphics Queue에 연결해 GPU 간 동기화
+    mUploadContext.SyncWithGraphicsQueue(mRenderer.GetCommandQueue());
 
     cube->AddComponent<RotatorComponent>(90.0f);
     scene->AddGameObject(cube);
@@ -175,7 +178,7 @@ void Application::Run()
                 mGizmoPanel.Draw(mEditorState, camComp->GetCamera());
             }
         }
-        mInspector.Draw(mEditorState);
+        mInspector.Draw(mEditorState, mResourceManager);
         mContentBrowser.Draw();
 
         float newWidth, newHeight, posX, posY;

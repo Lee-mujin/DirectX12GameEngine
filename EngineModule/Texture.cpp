@@ -1,64 +1,12 @@
 #include "pch.h"
 #include "Texture.h"
-#include <wincodec.h>
-#include <vector>
-
-namespace
-{
-    ComPtr<IWICImagingFactory> GetWicFactory()
-    {
-        static ComPtr<IWICImagingFactory> factory;
-        if (!factory)
-        {
-            CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-            ThrowIfFailed(CoCreateInstance(
-                CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                IID_PPV_ARGS(&factory)));
-        }
-        return factory;
-    }
-}
-
-void Texture::Create(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-    const std::wstring& path,
-    D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle)
-{
-    ComPtr<IWICImagingFactory> wicFactory = GetWicFactory();
-
-    ComPtr<IWICBitmapDecoder> decoder;
-    ThrowIfFailed(wicFactory->CreateDecoderFromFilename(
-        path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder));
-
-    ComPtr<IWICBitmapFrameDecode> frame;
-    ThrowIfFailed(decoder->GetFrame(0, &frame));
-
-    ComPtr<IWICFormatConverter> converter;
-    ThrowIfFailed(wicFactory->CreateFormatConverter(&converter));
-    ThrowIfFailed(converter->Initialize(
-        frame.Get(), GUID_WICPixelFormat32bppRGBA,
-        WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom));
-
-    UINT width = 0, height = 0;
-    ThrowIfFailed(converter->GetSize(&width, &height));
-
-    std::vector<BYTE> pixels(static_cast<size_t>(width) * height * 4);
-    ThrowIfFailed(converter->CopyPixels(nullptr, width * 4, static_cast<UINT>(pixels.size()), pixels.data()));
-
-    CreateFromPixels(device, commandList, pixels.data(), width, height, srvCpuHandle, srvGpuHandle);
-}
-
-void Texture::CreateSolidColor(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-    BYTE r, BYTE g, BYTE b, BYTE a,
-    D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle)
-{
-    BYTE pixel[4] = { r, g, b, a };
-    CreateFromPixels(device, commandList, pixel, 1, 1, srvCpuHandle, srvGpuHandle);
-}
+#include "d3dx12.h"
 
 void Texture::CreateFromPixels(ID3D12Device* device, ID3D12GraphicsCommandList* commandList,
-    const BYTE* pixels, UINT width, UINT height,
-    D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle)
+    const BYTE* pixels, UINT width, UINT height, const DescriptorHandle& srvHandle)
 {
+    mSrvHandle = srvHandle;
+
     D3D12_RESOURCE_DESC texDesc = {};
     texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     texDesc.Width = width;
@@ -70,9 +18,11 @@ void Texture::CreateFromPixels(ID3D12Device* device, ID3D12GraphicsCommandList* 
     texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
     CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT);
+
+    mState = D3D12_RESOURCE_STATE_COMMON;
     ThrowIfFailed(device->CreateCommittedResource(
         &defaultHeapProps, D3D12_HEAP_FLAG_NONE, &texDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+        mState, nullptr,
         IID_PPV_ARGS(&mTexture)));
 
     UINT64 uploadBufferSize = 0;
@@ -114,19 +64,24 @@ void Texture::CreateFromPixels(ID3D12Device* device, ID3D12GraphicsCommandList* 
 
     commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 
-    CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        mTexture.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST,
-        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    commandList->ResourceBarrier(1, &barrier);
-
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = texDesc.Format;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Texture2D.MipLevels = 1;
 
-    device->CreateShaderResourceView(mTexture.Get(), &srvDesc, srvCpuHandle);
+    device->CreateShaderResourceView(mTexture.Get(), &srvDesc, mSrvHandle.CpuHandle);
+}
 
-    mSrvGpuHandle = srvGpuHandle;
+void Texture::TransitionToRenderState(ID3D12GraphicsCommandList* cmdList)
+{
+    if (mState == D3D12_RESOURCE_STATE_COMMON)
+    {
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            mTexture.Get(),
+            D3D12_RESOURCE_STATE_COMMON,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        cmdList->ResourceBarrier(1, &barrier);
+        mState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
 }

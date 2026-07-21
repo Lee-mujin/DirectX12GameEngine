@@ -167,6 +167,7 @@
     <ClInclude Include="Component.h" />
     <ClInclude Include="ContentBrowser.h" />
     <ClInclude Include="DescriptorAllocator.h" />
+    <ClInclude Include="DescriptorHandle.h" />
     <ClInclude Include="DirectionalLight.h" />
     <ClInclude Include="EditorState.h" />
     <ClInclude Include="FrameResource.h" />

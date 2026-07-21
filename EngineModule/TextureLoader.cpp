@@ -3,6 +3,23 @@
 #include "Texture.h"
 #include "UploadContext.h"
 #include "DescriptorAllocator.h"
+#include <wincodec.h>
+
+namespace
+{
+    ComPtr<IWICImagingFactory> GetWicFactory()
+    {
+        static ComPtr<IWICImagingFactory> factory;
+        if (!factory)
+        {
+            CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+            ThrowIfFailed(CoCreateInstance(
+                CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                IID_PPV_ARGS(&factory)));
+        }
+        return factory;
+    }
+}
 
 void TextureLoader::Initialize(ID3D12Device* device, DescriptorAllocator* srvAllocator, UploadContext* uploadContext)
 {
@@ -11,18 +28,51 @@ void TextureLoader::Initialize(ID3D12Device* device, DescriptorAllocator* srvAll
     mUploadContext = uploadContext;
 }
 
+bool TextureLoader::DecodeWICFile(const std::wstring& path, std::vector<BYTE>& outPixels, UINT& outWidth, UINT& outHeight)
+{
+    ComPtr<IWICImagingFactory> wicFactory = GetWicFactory();
+
+    ComPtr<IWICBitmapDecoder> decoder;
+    if (FAILED(wicFactory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder)))
+        return false;
+
+    ComPtr<IWICBitmapFrameDecode> frame;
+    if (FAILED(decoder->GetFrame(0, &frame)))
+        return false;
+
+    ComPtr<IWICFormatConverter> converter;
+    if (FAILED(wicFactory->CreateFormatConverter(&converter)))
+        return false;
+
+    if (FAILED(converter->Initialize(
+        frame.Get(), GUID_WICPixelFormat32bppRGBA,
+        WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom)))
+        return false;
+
+    if (FAILED(converter->GetSize(&outWidth, &outHeight)))
+        return false;
+
+    outPixels.resize(static_cast<size_t>(outWidth) * outHeight * 4);
+    return SUCCEEDED(converter->CopyPixels(nullptr, outWidth * 4, static_cast<UINT>(outPixels.size()), outPixels.data()));
+}
+
 std::shared_ptr<Texture> TextureLoader::LoadTextureFromFile(const std::wstring& path)
 {
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+    std::vector<BYTE> pixels;
+    UINT width = 0, height = 0;
 
-    //렌더러를 우회하여 할당자 관리 기둥으로부터 다이렉트로 슬롯 획득
-    if (!mSrvAllocator->Allocate(cpuHandle, gpuHandle)) return nullptr;
+    //CPU에서 WIC 파일 로딩
+    if (!DecodeWICFile(path, pixels, width, height))
+        return nullptr;
+
+    DescriptorHandle srvHandle = mSrvAllocator->Allocate();
+    if (!srvHandle.IsValid())
+        return nullptr;
 
     auto texture = std::make_shared<Texture>();
 
-    mUploadContext->Execute([this, &path, cpuHandle, gpuHandle, texture](ID3D12GraphicsCommandList* cmdList) {
-        texture->Create(mDevice, cmdList, path, cpuHandle, gpuHandle);
+    mUploadContext->Execute([this, pixels = std::move(pixels), width, height, srvHandle, texture](ID3D12GraphicsCommandList* cmdList) {
+        texture->CreateFromPixels(mDevice, cmdList, pixels.data(), width, height, srvHandle);
         });
 
     return texture;
@@ -30,15 +80,15 @@ std::shared_ptr<Texture> TextureLoader::LoadTextureFromFile(const std::wstring& 
 
 std::shared_ptr<Texture> TextureLoader::CreateSolidColorTexture(BYTE r, BYTE g, BYTE b, BYTE a)
 {
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
-
-    if (!mSrvAllocator->Allocate(cpuHandle, gpuHandle)) return nullptr;
+    DescriptorHandle srvHandle = mSrvAllocator->Allocate();
+    if (!srvHandle.IsValid())
+        return nullptr;
 
     auto texture = std::make_shared<Texture>();
+    std::vector<BYTE> pixel = { r, g, b, a };
 
-    mUploadContext->Execute([this, r, g, b, a, cpuHandle, gpuHandle, texture](ID3D12GraphicsCommandList* cmdList) {
-        texture->CreateSolidColor(mDevice, cmdList, r, g, b, a, cpuHandle, gpuHandle);
+    mUploadContext->Execute([this, pixel = std::move(pixel), srvHandle, texture](ID3D12GraphicsCommandList* cmdList) {
+        texture->CreateFromPixels(mDevice, cmdList, pixel.data(), 1, 1, srvHandle);
         });
 
     return texture;
