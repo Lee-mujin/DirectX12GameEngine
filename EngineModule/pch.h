@@ -14,6 +14,7 @@
 #include <commdlg.h>
 #include <algorithm>
 #include <functional>
+#include <filesystem>
 #include "d3dx12.h"
 #include "Camera.h"
 #include "Matrix4x4.h"

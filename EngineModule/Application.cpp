@@ -15,12 +15,12 @@ bool Application::Initialize(HINSTANCE hInstance)
 
     if (!mRenderer.Initialize(mWindow.GetHWND(), mWindow.GetWidth(), mWindow.GetHeight())) return false;
 
-    //렌더러 CommandQueue 주입 제거 Device만 전달하여 내부 전용 CopyQueue 생성
+    // 렌더러 CommandQueue 주입 제거, Device만 전달하여 내부 전용 CopyQueue 생성
     if (!mUploadContext.Initialize(mRenderer.GetDevice())) return false;
 
     mTextureLoader.Initialize(mRenderer.GetDevice(), mRenderer.GetSrvAllocatorPtr(), &mUploadContext);
 
-    //DescriptorHandle 단일 객체 반환 받기
+    // DescriptorHandle 단일 객체 반환 받기
     DescriptorHandle fontHandle = mRenderer.AllocateSrvSlot();
 
     mImGuiLayer.Initialize(
@@ -30,7 +30,7 @@ bool Application::Initialize(HINSTANCE hInstance)
 
     mRenderer.SetImGuiLayer(&mImGuiLayer);
 
-    //ResourceManager에 세개 전부 전달
+    // ResourceManager에 세 개 모두 전달
     mResourceManager.Initialize(&mRenderer, &mTextureLoader, &mUploadContext);
     mSceneManager.Initialize();
 
@@ -50,11 +50,12 @@ bool Application::Initialize(HINSTANCE hInstance)
     meshRenderer->SetMesh(mResourceManager.GetCubeMesh());
 
     auto material = std::make_shared<Material>();
-    //mTextureLoader 직접 호출 제거 -> mResourceManager를 경유
-    material->SetTexture(mResourceManager.LoadTexture(L"Assets/Textures/Box.jpg"));
+    // ✨ AssetHandle과 함께 텍스처 바인딩
+    AssetHandle boxTexHandle = mResourceManager.GetOrCreateHandle("Assets/Textures/Box.jpg");
+    material->SetBaseColorTexture(mResourceManager.GetOrLoadTexture(boxTexHandle), boxTexHandle);
     meshRenderer->SetMaterial(material);
 
-    //CPU를 멈추는 Flush 대신, Copy Queue 작업 완결 신호를 Graphics Queue에 연결해 GPU 간 동기화
+    // CPU를 멈추는 Flush 대신, Copy Queue 작업 완결 신호를 Graphics Queue에 연결해 GPU 간 동기화
     mUploadContext.SyncWithGraphicsQueue(mRenderer.GetCommandQueue());
 
     cube->AddComponent<RotatorComponent>(90.0f);
@@ -117,7 +118,7 @@ std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
     renderer->SetMesh(model->GetMesh());
 
     auto material = std::make_shared<Material>();
-    material->SetTexture(mResourceManager.GetDefaultWhiteTexture());
+    material->SetBaseColorTexture(mResourceManager.GetDefaultWhiteTexture());
     renderer->SetMaterial(material);
 
     if (model->IsSkinned())

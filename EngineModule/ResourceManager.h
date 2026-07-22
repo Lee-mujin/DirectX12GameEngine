@@ -4,6 +4,14 @@
 #include <unordered_map>
 #include "AssetHandle.h"
 
+enum class AssetType
+{
+    Unknown,
+    Texture,
+    Model,
+    Scene
+};
+
 class Mesh;
 class Texture;
 class D3D12Renderer;
@@ -25,10 +33,15 @@ public:
 
     AssetHandle GetOrCreateHandle(const std::string& path);
     const std::string& GetPath(AssetHandle handle) const;
+
+    std::shared_ptr<Texture> GetOrLoadTexture(AssetHandle handle);
     std::shared_ptr<Model> GetOrLoadModel(AssetHandle handle);
+
     void RemapAsset(AssetHandle handle, const std::string& newPath);
 
-    //업로드 작업 완료 지점 동기화 래퍼
+    //AssetDatabase기반으로 내부 전환 예정
+    AssetType GetAssetType(AssetHandle handle) const;
+
     void FlushUploads();
 
 private:
@@ -43,6 +56,7 @@ private:
     std::unordered_map<std::string, uint32_t> mPathToId;
     std::unordered_map<uint32_t, std::string> mIdToPath;
     std::unordered_map<uint32_t, std::shared_ptr<Model>> mModelCache;
+    std::unordered_map<uint32_t, std::shared_ptr<Texture>> mTextureCache;
 
     static const std::string kEmptyPath;
 };

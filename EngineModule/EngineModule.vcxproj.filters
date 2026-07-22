@@ -201,6 +201,9 @@
     <ClInclude Include="DescriptorHandle.h">
       <Filter>Graphics\h</Filter>
     </ClInclude>
+    <ClInclude Include="ModelUtility.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -342,6 +345,9 @@
       <Filter>Graphics\cpp</Filter>
     </ClCompile>
     <ClCompile Include="TextureLoader.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelUtility.cpp">
       <Filter>Resource\cpp</Filter>
     </ClCompile>
   </ItemGroup>

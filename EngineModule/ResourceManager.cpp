@@ -157,3 +157,54 @@ void ResourceManager::FlushUploads()
         mUploadContext->Flush();
     }
 }
+
+std::shared_ptr<Texture> ResourceManager::GetOrLoadTexture(AssetHandle handle)
+{
+    if (!handle.IsValid()) return nullptr;
+
+    auto it = mTextureCache.find(handle.GetId());
+    if (it != mTextureCache.end())
+    {
+        return it->second;
+    }
+
+    const std::string& pathStr = GetPath(handle);
+    if (pathStr.empty()) return nullptr;
+
+    std::wstring widePath(pathStr.begin(), pathStr.end());
+    auto texture = LoadTexture(widePath);
+    if (texture)
+    {
+        mTextureCache[handle.GetId()] = texture;
+    }
+
+    return texture;
+}
+
+//현재는 확장자 기반이나 추후 Metadata 기반(return metadata.Type)으로 교체
+AssetType ResourceManager::GetAssetType(AssetHandle handle) const
+{
+    if (!handle.IsValid()) return AssetType::Unknown;
+
+    const std::string& pathStr = GetPath(handle);
+    if (pathStr.empty()) return AssetType::Unknown;
+
+    std::filesystem::path path(pathStr);
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".dds" || ext == ".tga")
+    {
+        return AssetType::Texture;
+    }
+    else if (ext == ".gltf" || ext == ".glb" || ext == ".fbx" || ext == ".obj")
+    {
+        return AssetType::Model;
+    }
+    else if (ext == ".txt" || ext == ".json" || ext == ".scene")
+    {
+        return AssetType::Scene;
+    }
+
+    return AssetType::Unknown;
+}
