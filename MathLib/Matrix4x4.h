@@ -68,4 +68,6 @@ public:
         };
         float m[4][4];
     };
+
+    bool Decompose(Vector3& outPosition, Quaternion& outRotation, Vector3& outScale) const;
 };

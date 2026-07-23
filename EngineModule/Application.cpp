@@ -7,6 +7,7 @@
 #include "SkinnedMesh.h"
 #include "Model.h"
 #include "SceneSerializer.h"
+#include "ModelUtility.h"
 
 bool Application::Initialize(HINSTANCE hInstance)
 {
@@ -32,6 +33,10 @@ bool Application::Initialize(HINSTANCE hInstance)
 
     // ResourceManager에 세 개 모두 전달
     mResourceManager.Initialize(&mRenderer, &mTextureLoader, &mUploadContext);
+
+    //렌더러에 기본 흰색 텍스처 주입
+    mRenderer.SetDefaultWhiteTexture(mResourceManager.GetDefaultWhiteTexture());
+
     mSceneManager.Initialize();
 
     float aspect = static_cast<float>(mWindow.GetWidth()) / static_cast<float>(mWindow.GetHeight());
@@ -50,7 +55,7 @@ bool Application::Initialize(HINSTANCE hInstance)
     meshRenderer->SetMesh(mResourceManager.GetCubeMesh());
 
     auto material = std::make_shared<Material>();
-    // ✨ AssetHandle과 함께 텍스처 바인딩
+    // AssetHandle과 함께 텍스처 바인딩
     AssetHandle boxTexHandle = mResourceManager.GetOrCreateHandle("Assets/Textures/Box.jpg");
     material->SetBaseColorTexture(mResourceManager.GetOrLoadTexture(boxTexHandle), boxTexHandle);
     meshRenderer->SetMaterial(material);
@@ -112,22 +117,13 @@ std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
 
     auto obj = std::make_shared<GameObject>();
     obj->SetName(fsPath.stem().string());
-    obj->SetSourceAssetHandle(handle);
 
-    MeshRenderer* renderer = obj->AddComponent<MeshRenderer>();
-    renderer->SetMesh(model->GetMesh());
+    //ModelUtility를 사용해 Mesh, Material 초기화, SourceHandle, Skinned/Static 구분을 한 번에 처리
+    ModelUtility::ReplaceModel(*obj, model, handle);
 
-    auto material = std::make_shared<Material>();
-    material->SetBaseColorTexture(mResourceManager.GetDefaultWhiteTexture());
-    renderer->SetMaterial(material);
-
+    // 스키니드 모델 기본 스케일/회전 보정
     if (model->IsSkinned())
     {
-        AnimatorComponent* animator = obj->AddComponent<AnimatorComponent>();
-        animator->SetSkeleton(model->GetSkeleton());
-        animator->SetAnimationList(model->GetAnimations());
-        animator->Play();
-
         obj->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
         obj->GetTransform().SetRotation(Vector3(90.0f, 0.0f, 0.0f));
     }
@@ -173,17 +169,12 @@ void Application::Run()
         {
             mHierarchy.Draw(*scene, mEditorState);
             mLight.Draw(*scene);
-
-            if (CameraComponent* camComp = scene->GetMainCamera())
-            {
-                mGizmoPanel.Draw(mEditorState, camComp->GetCamera());
-            }
         }
         mInspector.Draw(mEditorState, mResourceManager);
         mContentBrowser.Draw();
 
         float newWidth, newHeight, posX, posY;
-        mViewport.Draw(mRenderer.GetViewportSrvHandle(), newWidth, newHeight, posX, posY);
+        mViewport.Draw(mEditorState, mRenderer.GetViewportSrvHandle(), newWidth, newHeight, posX, posY);
 
         if (newWidth > 0 && newHeight > 0 &&
             (static_cast<UINT>(newWidth) != static_cast<UINT>(mViewportWidth) ||
@@ -195,6 +186,15 @@ void Application::Run()
         }
         mViewportPosX = posX;
         mViewportPosY = posY;
+
+        // Gizmo는 뷰포트 좌표가 확정된 뒤 여기서 그림
+        if (scene)
+        {
+            if (CameraComponent* camComp = scene->GetMainCamera())
+            {
+                mGizmoPanel.Draw(mEditorState, camComp->GetCamera(), mViewportPosX, mViewportPosY, mViewportWidth, mViewportHeight);
+            }
+        }
 
         mSceneManager.Update(&mInput, deltaTime);
 

@@ -55,7 +55,7 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetViewportSrvHandle() const { return mViewportTarget.GetSrvHandle(); }
 
     void TransitionToSwapChain();
-
+    void SetDefaultWhiteTexture(std::shared_ptr<Texture> texture) { mDefaultWhiteTexture = texture; }
 private:
     void InitializeCoreContext();
     void InitializeRenderTargets();
@@ -139,6 +139,8 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE mViewportSrvCpuHandle = { 0 };
     D3D12_GPU_DESCRIPTOR_HANDLE mViewportSrvGpuHandle = { 0 };
     bool mIsViewportSrvAllocated = false;
+
+    std::shared_ptr<Texture> mDefaultWhiteTexture;
 
     float mClearColor[4] = { 0.0f, 0.2f, 0.6f, 1.0f };
 };

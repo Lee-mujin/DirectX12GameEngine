@@ -14,13 +14,20 @@ void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material,
 {
     if (mObjectDrawIndex >= kMaxObjectsPerFrame) return;
 
-    // 렌더링 직전 Mesh 버퍼(Vertex/Index)를 COMMON -> VERTEX/INDEX_BUFFER 로 상태 전환
+    //Mesh 버퍼 상태 전환 (COMMON -> VERTEX/INDEX_BUFFER)
     const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
 
-    // Material에 텍스처가 있으면 COMMON -> PIXEL_SHADER_RESOURCE 로 상태 전환
-    if (auto texture = material.GetTexture())
+    //Material 텍스처가 없으면 D3D12Renderer의 mDefaultWhiteTexture 사용
+    std::shared_ptr<Texture> textureToBind = material.GetTexture();
+    if (!textureToBind)
     {
-        const_cast<Texture&>(*texture).TransitionToRenderState(mCommandList.Get());
+        textureToBind = mDefaultWhiteTexture;
+    }
+
+    //바인딩할 텍스처 상태 전환 (COMMON -> PIXEL_SHADER_RESOURCE)
+    if (textureToBind)
+    {
+        const_cast<Texture&>(*textureToBind).TransitionToRenderState(mCommandList.Get());
     }
 
     mCommandList->SetPipelineState(pso);
@@ -30,7 +37,6 @@ void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material,
     ObjectCBData objData;
     XMStoreFloat4x4(&objData.World, XMMatrixTranspose(D3D12RendererToXM(worldMatrix)));
 
-    //GetColor() -> GetBaseColor() 변경
     Vector3 matColor = material.GetBaseColor();
     objData.MaterialColor = XMFLOAT3(matColor.X, matColor.Y, matColor.Z);
     objData.Shininess = material.GetShininess();
@@ -50,9 +56,10 @@ void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material,
         mCommandList->SetGraphicsRootConstantBufferView(3, boneCBAddress);
     }
 
-    if (auto texture = material.GetTexture())
+    //매 드로우마다 4번 Root Slot에 확실하게 Descriptor Table 설정 (상태 오염 방지)
+    if (textureToBind)
     {
-        mCommandList->SetGraphicsRootDescriptorTable(4, texture->GetSrvHandle());
+        mCommandList->SetGraphicsRootDescriptorTable(4, textureToBind->GetSrvHandle());
     }
 
     mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());

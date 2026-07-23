@@ -1,13 +1,16 @@
 #pragma once
-
 class EditorState;
 class Camera;
 
 class Gizmo
 {
 public:
-    void Draw(EditorState& editorState, const Camera& camera);
+    Gizmo() = default;
+    ~Gizmo() = default;
+
+    void Draw(EditorState& editorState, const Camera& camera, float viewportX, float viewportY, float viewportWidth, float viewportHeight);
 
 private:
-    int mOperation = 0; // ImGuizmo::OPERATION 캐스팅용 (Translate/Rotate/Scale)
+    int mOperation = 0;   // 0 = Translate, 1 = Rotate, 2 = Scale
+    bool mIsLocal = false; // false = World, true = Local
 };

@@ -192,3 +192,29 @@ bool Matrix4x4::operator!=(const Matrix4x4& other) const
 {
     return 0 != std::memcmp(this, &other, sizeof(Matrix4x4));
 }
+
+bool Matrix4x4::Decompose(Vector3& outPosition, Quaternion& outRotation, Vector3& outScale) const
+{
+    XMVECTOR scale;
+    XMVECTOR rotation;
+    XMVECTOR translation;
+
+    // DirectXMath의 행렬 분해 연산 수행
+    if (XMMatrixDecompose(&scale, &rotation, &translation, ToXM(*this)))
+    {
+        XMFLOAT3 s, t;
+        XMFLOAT4 r;
+
+        XMStoreFloat3(&s, scale);
+        XMStoreFloat4(&r, rotation);
+        XMStoreFloat3(&t, translation);
+
+        outScale = Vector3(s.x, s.y, s.z);
+        outRotation = Quaternion(r.x, r.y, r.z, r.w);
+        outPosition = Vector3(t.x, t.y, t.z);
+
+        return true;
+    }
+
+    return false;
+}
