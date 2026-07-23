@@ -27,10 +27,19 @@ void D3D12Renderer::TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_
 
 void D3D12Renderer::SyncFrameViaRingBuffer(FrameResource& fr)
 {
-    if (fr.fenceValue != 0 && mFence->GetCompletedValue() < fr.fenceValue)
+    //fenceValue가 0이 아니고, GPU 처리 값(GetCompletedValue)보다 크면 대기
+    if (fr.fenceValue != 0)
     {
-        ThrowIfFailed(mFence->SetEventOnCompletion(fr.fenceValue, mFenceEvent));
-        WaitForSingleObject(mFenceEvent, INFINITE);
+        if (mFence->GetCompletedValue() < fr.fenceValue)
+        {
+            ThrowIfFailed(mFence->SetEventOnCompletion(fr.fenceValue, mFenceEvent));
+            WaitForSingleObject(mFenceEvent, INFINITE);
+        }
+    }
+    else
+    {
+        //첫 프레임 초기화 시점에 실행 중인 GPU 작업이 있다면 Flush
+        WaitForGpu();
     }
 }
 
@@ -130,6 +139,7 @@ void D3D12Renderer::EndFrame()
 
     mFenceValue++;
     ThrowIfFailed(mCommandQueue->Signal(mFence.Get(), mFenceValue));
+
     mFrameResources[mCurrentFrameResourceIndex].fenceValue = mFenceValue;
 
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
@@ -151,5 +161,10 @@ void D3D12Renderer::WaitForGpu()
 void D3D12Renderer::Cleanup()
 {
     WaitForGpu();
-    CloseHandle(mFenceEvent);
+
+    if (mFenceEvent)
+    {
+        CloseHandle(mFenceEvent);
+        mFenceEvent = nullptr;
+    }
 }

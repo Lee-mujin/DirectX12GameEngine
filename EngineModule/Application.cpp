@@ -100,6 +100,7 @@ bool Application::Initialize(HINSTANCE hInstance)
     scene->SetSpotLight(spotLight);
 
     mSceneManager.ChangeScene(scene);
+    mRenderer.WaitForGpu();
 
     return true;
 }

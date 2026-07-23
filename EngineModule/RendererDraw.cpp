@@ -17,21 +17,40 @@ void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material,
     //Mesh 버퍼 상태 전환 (COMMON -> VERTEX/INDEX_BUFFER)
     const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
 
-    //Material 텍스처가 없으면 D3D12Renderer의 mDefaultWhiteTexture 사용
-    std::shared_ptr<Texture> textureToBind = material.GetTexture();
-    if (!textureToBind)
-    {
-        textureToBind = mDefaultWhiteTexture;
-    }
-
-    //바인딩할 텍스처 상태 전환 (COMMON -> PIXEL_SHADER_RESOURCE)
-    if (textureToBind)
-    {
-        const_cast<Texture&>(*textureToBind).TransitionToRenderState(mCommandList.Get());
-    }
-
     mCommandList->SetPipelineState(pso);
 
+    //BaseColor 텍스처 처리 (Root Slot 4)
+    std::shared_ptr<Texture> baseTexture = material.GetTexture();
+    if (!baseTexture)
+    {
+        baseTexture = mDefaultWhiteTexture;
+    }
+
+    if (baseTexture)
+    {
+        const_cast<Texture&>(*baseTexture).TransitionToRenderState(mCommandList.Get());
+        mCommandList->SetGraphicsRootDescriptorTable(4, baseTexture->GetSrvHandle());
+    }
+
+    //NormalMap 텍스처 처리 (Root Slot 5)
+    std::shared_ptr<Texture> normalTexture = material.GetNormalTexture();
+    bool hasNormalMap = (normalTexture != nullptr);
+
+    if (hasNormalMap)
+    {
+        const_cast<Texture&>(*normalTexture).TransitionToRenderState(mCommandList.Get());
+        mCommandList->SetGraphicsRootDescriptorTable(5, normalTexture->GetSrvHandle());
+    }
+    else
+    {
+        // 바인딩 안 하면 이전 드로우의 값이 남을 수 있어 기본 텍스처로 대치 바인딩
+        if (mDefaultWhiteTexture)
+        {
+            mCommandList->SetGraphicsRootDescriptorTable(5, mDefaultWhiteTexture->GetSrvHandle());
+        }
+    }
+
+    // 4. Constant Buffer 데이터 채우기
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
 
     ObjectCBData objData;
@@ -41,12 +60,16 @@ void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material,
     objData.MaterialColor = XMFLOAT3(matColor.X, matColor.Y, matColor.Z);
     objData.Shininess = material.GetShininess();
 
+    //5. 노멀 맵 적용 유무 플래그 전달
+    objData.HasNormalMap = hasNormalMap ? 1 : 0;
+
     UINT8* objDest = fr.objectCBMapped + mObjectDrawIndex * fr.objectCBStride;
     memcpy(objDest, &objData, sizeof(objData));
 
     D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress = fr.objectCB->GetGPUVirtualAddress() + mObjectDrawIndex * fr.objectCBStride;
     mCommandList->SetGraphicsRootConstantBufferView(0, objectCBAddress);
 
+    // 6. Skinned Animation Bone Constant Buffer
     if (boneData)
     {
         UINT8* boneDest = fr.boneCBMapped + mObjectDrawIndex * fr.boneCBStride;
@@ -56,12 +79,7 @@ void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material,
         mCommandList->SetGraphicsRootConstantBufferView(3, boneCBAddress);
     }
 
-    //매 드로우마다 4번 Root Slot에 확실하게 Descriptor Table 설정 (상태 오염 방지)
-    if (textureToBind)
-    {
-        mCommandList->SetGraphicsRootDescriptorTable(4, textureToBind->GetSrvHandle());
-    }
-
+    // 7. Draw Call 수행
     mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
     mCommandList->IASetIndexBuffer(&mesh.GetIndexBufferView());
     mCommandList->DrawIndexedInstanced(mesh.GetIndexCount(), 1, 0, 0, 0);

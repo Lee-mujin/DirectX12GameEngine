@@ -10,6 +10,8 @@ struct ObjectCBData
     DirectX::XMFLOAT4X4 World;
     DirectX::XMFLOAT3 MaterialColor;
     float Shininess;
+    int HasNormalMap;
+    DirectX::XMFLOAT3 Pad0;
 };
 
 struct CameraCBData //카메라 위치

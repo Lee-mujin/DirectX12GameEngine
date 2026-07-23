@@ -18,6 +18,7 @@
 #include "d3dx12.h"
 #include "Camera.h"
 #include "Matrix4x4.h"
+#include "Vector2.h"
 #include "Vector3.h"
 #include "Mesh.h"
 #include "Material.h"

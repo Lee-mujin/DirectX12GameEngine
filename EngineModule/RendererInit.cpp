@@ -60,6 +60,7 @@ void D3D12Renderer::CreateFactory()
 
 void D3D12Renderer::CreateDevice()
 {
+
     ThrowIfFailed(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&mDevice)));
 }
 
@@ -174,15 +175,19 @@ void D3D12Renderer::CreateShader()
 
 void D3D12Renderer::CreateRootSignature()
 {
-    CD3DX12_DESCRIPTOR_RANGE srvRange;
-    srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+    CD3DX12_DESCRIPTOR_RANGE srvRangeBase;
+    srvRangeBase.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0
 
-    CD3DX12_ROOT_PARAMETER rootParams[5];
-    rootParams[0].InitAsConstantBufferView(0);
-    rootParams[1].InitAsConstantBufferView(1);
-    rootParams[2].InitAsConstantBufferView(2);
-    rootParams[3].InitAsConstantBufferView(3);
-    rootParams[4].InitAsDescriptorTable(1, &srvRange, D3D12_SHADER_VISIBILITY_PIXEL);
+    CD3DX12_DESCRIPTOR_RANGE srvRangeNormal;
+    srvRangeNormal.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1
+
+    CD3DX12_ROOT_PARAMETER rootParams[6]; // 5 -> 6
+    rootParams[0].InitAsConstantBufferView(0); // ObjectCB
+    rootParams[1].InitAsConstantBufferView(1); // CameraCB
+    rootParams[2].InitAsConstantBufferView(2); // LightCB
+    rootParams[3].InitAsConstantBufferView(3); // BoneCB
+    rootParams[4].InitAsDescriptorTable(1, &srvRangeBase, D3D12_SHADER_VISIBILITY_PIXEL);   // BaseColor
+    rootParams[5].InitAsDescriptorTable(1, &srvRangeNormal, D3D12_SHADER_VISIBILITY_PIXEL); // Normal
 
     D3D12_STATIC_SAMPLER_DESC sampler = {};
     sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -205,10 +210,11 @@ void D3D12Renderer::CreatePipelineState(ID3DBlob* vsBlob, ID3DBlob* psBlob, ID3D
     {
         { "POSITION",    0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL",      0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BONEINDICES", 0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "BONEWEIGHTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT",     0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // 추가
+        { "COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // 오프셋 24->40
+        { "TEXCOORD",    0, DXGI_FORMAT_R32G32_FLOAT,       0, 56, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // 오프셋 40->56
+        { "BONEINDICES", 0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // 오프셋 48->64
+        { "BONEWEIGHTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 80, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // 오프셋 64->80
     };
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};

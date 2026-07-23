@@ -6,8 +6,9 @@
 #include "SkinnedMesh.h"
 #include "Skeleton.h"
 #include "Animation.h"
-#include "UploadContext.h" //추가
+#include "UploadContext.h"
 #include <vector>
+#include <cmath>
 
 namespace
 {
@@ -18,6 +19,74 @@ namespace
             m[4], m[5], m[6], m[7],
             m[8], m[9], m[10], m[11],
             m[12], m[13], m[14], m[15]);
+    }
+
+    //Tangent가 없는 파일일 경우 Lengyel's Method(Gram-Schmidt 직교화)로 계산
+    void ComputeTangentsIfMissing(std::vector<Vertex>& vertices, const std::vector<UINT16>& indices, bool hasTangents)
+    {
+        if (hasTangents)
+        {
+            return; // 파일에 이미 있으면 계산 불필요
+        }
+
+        std::vector<Vector3> tan1(vertices.size(), Vector3::Zero);
+        std::vector<Vector3> tan2(vertices.size(), Vector3::Zero);
+
+        for (size_t i = 0; i + 2 < indices.size(); i += 3)
+        {
+            UINT16 i0 = indices[i], i1 = indices[i + 1], i2 = indices[i + 2];
+
+            Vector3 p0(vertices[i0].position[0], vertices[i0].position[1], vertices[i0].position[2]);
+            Vector3 p1(vertices[i1].position[0], vertices[i1].position[1], vertices[i1].position[2]);
+            Vector3 p2(vertices[i2].position[0], vertices[i2].position[1], vertices[i2].position[2]);
+
+            Vector2 uv0(vertices[i0].uv[0], vertices[i0].uv[1]);
+            Vector2 uv1(vertices[i1].uv[0], vertices[i1].uv[1]);
+            Vector2 uv2(vertices[i2].uv[0], vertices[i2].uv[1]);
+
+            Vector3 edge1 = p1 - p0;
+            Vector3 edge2 = p2 - p0;
+            float du1 = uv1.X - uv0.X, dv1 = uv1.Y - uv0.Y;
+            float du2 = uv2.X - uv0.X, dv2 = uv2.Y - uv0.Y;
+
+            float denom = du1 * dv2 - du2 * dv1;
+            if (std::fabsf(denom) < 0.0001f)
+            {
+                continue; // UV 퇴화 삼각형, 스킵
+            }
+            float r = 1.0f / denom;
+
+            Vector3 sdir = (edge1 * dv2 - edge2 * dv1) * r;
+            Vector3 tdir = (edge2 * du1 - edge1 * du2) * r;
+
+            tan1[i0] += sdir; tan1[i1] += sdir; tan1[i2] += sdir;
+            tan2[i0] += tdir; tan2[i1] += tdir; tan2[i2] += tdir;
+        }
+
+        for (size_t i = 0; i < vertices.size(); ++i)
+        {
+            Vector3 n(vertices[i].normal[0], vertices[i].normal[1], vertices[i].normal[2]);
+            Vector3 t = tan1[i]; // Gram-Schmidt 직교화: normal 성분 제거
+
+            // t가 Zero 벡터인 경우(UV가 비어있거나 문제 있는 경우) 방지
+            if (t.GetSizeSq() < 0.0001f)
+            {
+                vertices[i].tangent[0] = 1.0f;
+                vertices[i].tangent[1] = 0.0f;
+                vertices[i].tangent[2] = 0.0f;
+                vertices[i].tangent[3] = 1.0f;
+                continue;
+            }
+
+            Vector3 tangent = (t - n * Vector3::Dot(n, t)).GetNormalize();
+
+            float handedness = (Vector3::Dot(Vector3::Cross(n, tangent), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
+
+            vertices[i].tangent[0] = tangent.X;
+            vertices[i].tangent[1] = tangent.Y;
+            vertices[i].tangent[2] = tangent.Z;
+            vertices[i].tangent[3] = handedness;
+        }
     }
 }
 
@@ -50,6 +119,7 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, UploadCo
 
     cgltf_accessor* positionAccessor = nullptr;
     cgltf_accessor* normalAccessor = nullptr;
+    cgltf_accessor* tangentAccessor = nullptr;
     cgltf_accessor* uvAccessor = nullptr;
 
     for (size_t i = 0; i < primitive.attributes_count; ++i)
@@ -63,6 +133,10 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, UploadCo
         else if (attr.type == cgltf_attribute_type_normal)
         {
             normalAccessor = attr.data;
+        }
+        else if (attr.type == cgltf_attribute_type_tangent)
+        {
+            tangentAccessor = attr.data;
         }
         else if (attr.type == cgltf_attribute_type_texcoord && uvAccessor == nullptr)
         {
@@ -96,6 +170,16 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, UploadCo
             vertices[i].normal[2] = normal[2];
         }
 
+        if (tangentAccessor)
+        {
+            float tan[4] = {};
+            cgltf_accessor_read_float(tangentAccessor, i, tan, 4);
+            vertices[i].tangent[0] = tan[0];
+            vertices[i].tangent[1] = tan[1];
+            vertices[i].tangent[2] = tan[2];
+            vertices[i].tangent[3] = tan[3];
+        }
+
         if (uvAccessor)
         {
             float uv[2] = {};
@@ -123,8 +207,10 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, UploadCo
 
     cgltf_free(data);
 
+    //메쉬 생성 직전, Tangent 데이터가 없으면 자동 계산
+    ComputeTangentsIfMissing(vertices, indices, tangentAccessor != nullptr);
+
     auto result = std::make_shared<Mesh>();
-    //uploadContext 인자 전달
     result->Create(device, uploadContext, vertices, indices);
     return result;
 }
@@ -161,7 +247,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
     const cgltf_primitive& primitive = data->meshes[0].primitives[0];
     const cgltf_skin& skin = data->skins[0];
 
-    //Skeleton 구성
+    // Skeleton 구성
     auto skeleton = std::make_shared<Skeleton>();
     skeleton->Bones.resize(skin.joints_count);
 
@@ -206,9 +292,10 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         }
     }
 
-    //정점 데이터
+    // 정점 데이터
     cgltf_accessor* positionAccessor = nullptr;
     cgltf_accessor* normalAccessor = nullptr;
+    cgltf_accessor* tangentAccessor = nullptr;
     cgltf_accessor* uvAccessor = nullptr;
     cgltf_accessor* jointsAccessor = nullptr;
     cgltf_accessor* weightsAccessor = nullptr;
@@ -220,6 +307,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         {
         case cgltf_attribute_type_position: positionAccessor = attr.data; break;
         case cgltf_attribute_type_normal: normalAccessor = attr.data; break;
+        case cgltf_attribute_type_tangent: tangentAccessor = attr.data; break;
         case cgltf_attribute_type_texcoord: if (!uvAccessor) uvAccessor = attr.data; break;
         case cgltf_attribute_type_joints: if (!jointsAccessor) jointsAccessor = attr.data; break;
         case cgltf_attribute_type_weights: if (!weightsAccessor) weightsAccessor = attr.data; break;
@@ -251,6 +339,16 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
             vertices[i].normal[0] = normal[0];
             vertices[i].normal[1] = normal[1];
             vertices[i].normal[2] = normal[2];
+        }
+
+        if (tangentAccessor)
+        {
+            float tan[4] = {};
+            cgltf_accessor_read_float(tangentAccessor, i, tan, 4);
+            vertices[i].tangent[0] = tan[0];
+            vertices[i].tangent[1] = tan[1];
+            vertices[i].tangent[2] = tan[2];
+            vertices[i].tangent[3] = tan[3]; // handedness
         }
 
         if (uvAccessor)
@@ -299,7 +397,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         }
     }
 
-    //애니메이션
+    // 애니메이션
     if (outAnimations && data->animations_count > 0)
     {
         for (size_t a = 0; a < data->animations_count; ++a)
@@ -395,8 +493,10 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
 
     cgltf_free(data);
 
+    //스키니드 메쉬 생성 직전, Tangent 데이터가 없으면 자동 계산
+    ComputeTangentsIfMissing(vertices, indices, tangentAccessor != nullptr);
+
     auto result = std::make_shared<SkinnedMesh>();
-    //uploadContext 인자 전달
     result->Create(device, uploadContext, vertices, indices);
     result->SetSkeleton(skeleton);
 

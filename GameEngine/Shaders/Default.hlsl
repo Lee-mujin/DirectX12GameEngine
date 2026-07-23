@@ -3,6 +3,8 @@ cbuffer ObjectCB : register(b0)
     matrix gWorld;
     float3 gMaterialColor;
     float gShininess;
+    int gHasNormalMap;
+    float3 gObjectPad0;
 };
 
 cbuffer CameraCB : register(b1)
@@ -54,6 +56,7 @@ struct VSInput
 {
     float3 position : POSITION;
     float3 normal : NORMAL;
+    float4 tangent : TANGENT; // 추가
     float4 color : COLOR;
     float2 uv : TEXCOORD;
 };
@@ -63,6 +66,8 @@ struct PSInput
     float4 position : SV_POSITION;
     float3 worldPos : TEXCOORD1;
     float3 normalWS : NORMAL;
+    float3 tangentWS : TANGENT;
+    float3 bitangentWS : BINORMAL;
     float4 color : COLOR;
     float2 uv : TEXCOORD0;
 };
@@ -71,6 +76,7 @@ struct SkinnedVSInput
 {
     float3 position : POSITION;
     float3 normal : NORMAL;
+    float4 tangent : TANGENT;
     float4 color : COLOR;
     float2 uv : TEXCOORD;
     uint4 boneIndices : BONEINDICES;
@@ -89,11 +95,20 @@ PSInput VSMain_Skinned(SkinnedVSInput input)
 
     float4 skinnedPos = mul(float4(input.position, 1.0f), skinMatrix);
     float3 skinnedNormal = mul(input.normal, (float3x3) skinMatrix);
+    float3 skinnedTangent = mul(input.tangent.xyz, (float3x3) skinMatrix);
 
     float4 worldPos = mul(skinnedPos, gWorld);
     output.worldPos = worldPos.xyz;
     output.position = mul(mul(worldPos, gView), gProj);
-    output.normalWS = normalize(mul(skinnedNormal, (float3x3) gWorld));
+
+    float3 N = normalize(mul(skinnedNormal, (float3x3) gWorld));
+    float3 T = normalize(mul(skinnedTangent, (float3x3) gWorld));
+    T = normalize(T - N * dot(N, T));
+    float3 B = cross(N, T) * input.tangent.w;
+
+    output.normalWS = N;
+    output.tangentWS = T;
+    output.bitangentWS = B;
     output.color = input.color;
     output.uv = input.uv;
 
@@ -107,7 +122,15 @@ PSInput VSMain(VSInput input)
     float4 worldPos = mul(float4(input.position, 1.0f), gWorld);
     output.worldPos = worldPos.xyz;
     output.position = mul(mul(worldPos, gView), gProj);
-    output.normalWS = normalize(mul(input.normal, (float3x3) gWorld));
+
+    float3 N = normalize(mul(input.normal, (float3x3) gWorld));
+    float3 T = normalize(mul(input.tangent.xyz, (float3x3) gWorld));
+    T = normalize(T - N * dot(N, T)); // Gram-Schmidt, gWorld 스케일로 인한 비직교 보정
+    float3 B = cross(N, T) * input.tangent.w;
+
+    output.normalWS = N;
+    output.tangentWS = T;
+    output.bitangentWS = B;
     output.color = input.color;
     output.uv = input.uv;
 
@@ -186,17 +209,33 @@ float3 CalcPointLight(float3 worldPos, float3 normal, float3 viewDir)
     return (diffuse + specular * 0.3f) * attenuation;
 }
 
+Texture2D gNormalTexture : register(t1); // 추가 (기존 gTexture는 t0 그대로)
+
 float4 PSMain(PSInput input) : SV_TARGET
 {
     float4 texColor = gTexture.Sample(gSampler, input.uv);
     float4 baseColor = texColor * input.color * float4(gMaterialColor, 1.0f);
 
-    float3 normal = normalize(input.normalWS);
+    float3 N = normalize(input.normalWS);
+
+    // Normal Map이 있으면 TBN으로 world normal 교체, 없으면 정점 normal 그대로 사용
+    if (gHasNormalMap)
+    {
+        float3 T = normalize(input.tangentWS);
+        float3 B = normalize(input.bitangentWS);
+        float3x3 TBN = float3x3(T, B, N);
+
+        float3 tangentNormal = gNormalTexture.Sample(gSampler, input.uv).rgb;
+        tangentNormal = tangentNormal * 2.0f - 1.0f; // 0~1 -> -1~1
+
+        N = normalize(mul(tangentNormal, TBN));
+    }
+
     float3 viewDir = normalize(gCameraPos - input.worldPos);
 
-    float3 lighting = CalcDirLight(normal, viewDir)
-        + CalcPointLight(input.worldPos, normal, viewDir)
-        + CalcSpotLight(input.worldPos, normal, viewDir);
+    float3 lighting = CalcDirLight(N, viewDir)
+        + CalcPointLight(input.worldPos, N, viewDir)
+        + CalcSpotLight(input.worldPos, N, viewDir);
 
     return float4(baseColor.rgb * lighting, baseColor.a);
 }
