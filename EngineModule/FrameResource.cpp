@@ -34,4 +34,7 @@ void FrameResource::Create(ID3D12Device* device, UINT maxObjectCount)
 
     boneCBStride = Align256(sizeof(BoneCBData));
     CreateUploadBuffer(device, boneCBStride * maxObjectCount, boneCB, &boneCBMapped); //boneCB추가
+
+    shadowCBStride = Align256(sizeof(ShadowCBData));
+    CreateUploadBuffer(device, shadowCBStride * maxObjectCount, shadowCB, &shadowCBMapped);
 }

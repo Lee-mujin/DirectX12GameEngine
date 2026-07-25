@@ -10,7 +10,9 @@
 #include "FrameResource.h"
 #include "RenderTarget.h"
 #include "DescriptorAllocator.h"
-
+#include "ShadowMap.h"
+#include "MathUtil.h"
+#include "Matrix4x4.h"
 using Microsoft::WRL::ComPtr;
 
 class Mesh;
@@ -19,7 +21,6 @@ class Camera;
 class Texture;
 class ImGuiLayer;
 class SkinnedMesh;
-struct Matrix4x4;
 struct DirectionalLight;
 struct PointLight;
 struct SpotLight;
@@ -56,6 +57,17 @@ public:
 
     void TransitionToSwapChain();
     void SetDefaultWhiteTexture(std::shared_ptr<Texture> texture) { mDefaultWhiteTexture = texture; }
+
+    bool InitializeShadowMap(); // Initialize() 안에서 호출
+    void RenderShadowPass(const DirectionalLight& light, const std::vector<std::pair<const Mesh*, Matrix4x4>>& staticDrawList
+        /* 스키닝 드로우 목록도 필요하면 별도 오버로드 또는 구조체로 */);
+    void BeginShadowPass(const DirectionalLight& light);
+    void DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix);
+    void DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
+    void EndShadowPass();
+
+    Matrix4x4 GetLightViewProj() const { return mLightViewProj; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetShadowMapSRV() const { return mShadowMap.GetSRV(); }
 private:
     void InitializeCoreContext();
     void InitializeRenderTargets();
@@ -71,7 +83,7 @@ private:
     void UpdateLightConstantBuffer(FrameResource& fr, const DirectionalLight& dirLight, const PointLight& pointLight, const SpotLight& spotLight);
 
     void TransitionResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
-    void CreatePipelineState(ID3DBlob* vsBlob, ID3DBlob* psBlob, ID3D12PipelineState** outPSO);
+    void CreatePipelineState(ID3DBlob* vsBlob, ID3DBlob* psBlob, ID3D12RootSignature* rootSig, DXGI_FORMAT dsvFormat, bool isShadowPSO, ID3D12PipelineState** outPSO);
 
     void CreateFactory();
     void CreateDevice();
@@ -141,6 +153,17 @@ private:
     bool mIsViewportSrvAllocated = false;
 
     std::shared_ptr<Texture> mDefaultWhiteTexture;
+
+    ShadowMap mShadowMap;
+    ComPtr<ID3D12RootSignature> mShadowRootSignature;
+    ComPtr<ID3D12PipelineState> mShadowPSO;
+    ComPtr<ID3D12PipelineState> mShadowSkinnedPSO;
+    ComPtr<ID3DBlob> mShadowVertexShader;
+    ComPtr<ID3DBlob> mShadowSkinnedVertexShader;
+    UINT mShadowDrawIndex = 0;
+    Matrix4x4 mLightViewProj; //Main Pass 셰이더에 넘길 때 씀
+
+    bool mIsCommandListRecording = false;
 
     float mClearColor[4] = { 0.0f, 0.2f, 0.6f, 1.0f };
 };

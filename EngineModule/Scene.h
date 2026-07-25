@@ -21,6 +21,7 @@ public:
     void SetMainLight(const DirectionalLight& light) { mMainLight = light; }
     void SetPointLight(const PointLight& light) { mPointLight = light; }
     void SetSpotLight(const SpotLight& light) { mSpotLight = light; }
+    void RenderShadowPass(D3D12Renderer& renderer);
     void ClearAssetObjects();
 public:
     DirectionalLight& GetMainLight() { return mMainLight; } //const 아닌 참조로

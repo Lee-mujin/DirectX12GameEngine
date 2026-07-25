@@ -1,3 +1,4 @@
+// Scene.cpp
 #include "pch.h"
 #include "Scene.h"
 #include "D3D12Renderer.h"
@@ -14,19 +15,25 @@ void Scene::Update(Input* input, float deltaTime)
         obj->Update(deltaTime);
     }
 }
-//Scene 안의 카메라 GameObject가 알아서 업데이트 되도록 구현
+
 void Scene::Render(D3D12Renderer& renderer)
 {
     if (!mMainCamera) return;
 
+    //메인 패스 시작 (카메라 및 조명 CB 업데이트)
     renderer.BeginFrame(mMainCamera->GetCamera(), mMainLight, mPointLight, mSpotLight);
 
+    //씬 오브젝트들 메인 렌더링
     for (auto& obj : mObjects)
     {
-        obj->Render(renderer);
+        if (obj)
+        {
+            obj->Render(renderer);
+        }
     }
 
-    renderer.EndFrame();
+    //메인 패스 마무리 (스왑체인 백버퍼 전환)
+    renderer.TransitionToSwapChain();
 }
 
 void Scene::AddGameObject(std::shared_ptr<GameObject> object)
@@ -43,4 +50,16 @@ void Scene::ClearAssetObjects()
                 return obj->GetSourceAssetHandle().IsValid();
             }),
         mObjects.end());
+}
+
+void Scene::RenderShadowPass(D3D12Renderer& renderer)
+{
+    renderer.BeginShadowPass(mMainLight);
+
+    for (auto& obj : mObjects)
+    {
+        obj->RenderShadow(renderer);
+    }
+
+    renderer.EndShadowPass();
 }

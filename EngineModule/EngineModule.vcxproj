@@ -195,6 +195,7 @@
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SceneSerializer.h" />
+    <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="SkinnedMesh.h" />
     <ClInclude Include="SpotLight.h" />
@@ -272,6 +273,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SceneSerializer.cpp" />
+    <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
     <ClCompile Include="Timer.cpp" />

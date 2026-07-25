@@ -13,6 +13,7 @@ public:
     void SetMaterial(std::shared_ptr<Material> material) { mMaterial = material; }
 
     void Render(D3D12Renderer& renderer) override;
+    void RenderShadow(D3D12Renderer& renderer) override;
 
     std::shared_ptr<Material> GetMaterial() const { return mMaterial; }
 

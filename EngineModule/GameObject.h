@@ -17,7 +17,7 @@ public:
 
     virtual void Update(float deltaTime);
     virtual void Render(D3D12Renderer& renderer);
-
+    virtual void RenderShadow(D3D12Renderer& renderer);
     //컴포넌트 중복 생성 방지: 이미 존재하면 기존 포인터 반환
     template<typename T, typename... Args>
     T* AddComponent(Args&&... args)
@@ -72,7 +72,6 @@ public:
     AssetHandle GetSourceAssetHandle() const { return mSourceAssetHandle; }
     void SetSourceAssetHandle(AssetHandle handle) { mSourceAssetHandle = handle; }
     void SetName(const std::string& name) { mName = name; }
-
 protected:
     Transform mTransform;
     std::vector<std::unique_ptr<Component>> mComponents;

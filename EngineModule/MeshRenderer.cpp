@@ -33,3 +33,20 @@ void MeshRenderer::Render(D3D12Renderer& renderer)
         renderer.DrawMesh(*mMesh, *mMaterial, GetOwner()->GetTransform().GetMatrix());
     }
 }
+
+void MeshRenderer::RenderShadow(D3D12Renderer& renderer)
+{
+    if (!mMesh) return; // Material 필요 없음, Shadow Pass는 Depth만
+
+    if (auto skinnedMesh = std::dynamic_pointer_cast<SkinnedMesh>(mMesh))
+    {
+        AnimatorComponent* animator = GetOwner()->GetComponent<AnimatorComponent>();
+        static const std::vector<Matrix4x4> kEmpty;
+        const auto& boneMatrices = animator ? animator->GetFinalBoneMatrices() : kEmpty;
+        renderer.DrawShadowSkinnedMesh(*skinnedMesh, GetOwner()->GetTransform().GetMatrix(), boneMatrices);
+    }
+    else
+    {
+        renderer.DrawShadowMesh(*mMesh, GetOwner()->GetTransform().GetMatrix());
+    }
+}

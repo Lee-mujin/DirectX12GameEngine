@@ -51,6 +51,11 @@ struct LightCBData
     DirectX::XMFLOAT2 Pad2;
 };
 
+struct ShadowCBData
+{
+    DirectX::XMFLOAT4X4 WorldLightViewProj;
+};
+
 static constexpr UINT MAX_BONES = 96;
 
 struct BoneCBData //BoneCB 추가
@@ -78,6 +83,10 @@ public:
     ComPtr<ID3D12Resource> boneCB;
     UINT8* boneCBMapped = nullptr;
     UINT boneCBStride = 0;
+
+    ComPtr<ID3D12Resource> shadowCB;
+    UINT8* shadowCBMapped = nullptr;
+    UINT shadowCBStride = 0;
 
     UINT64 fenceValue = 0; //이 FrameResource를 마지막으로 쓴 프레임의 fence 값
 };

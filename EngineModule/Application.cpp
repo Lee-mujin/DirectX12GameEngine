@@ -177,18 +177,19 @@ void Application::Run()
         float newWidth, newHeight, posX, posY;
         mViewport.Draw(mEditorState, mRenderer.GetViewportSrvHandle(), newWidth, newHeight, posX, posY);
 
+        // 뷰포트 정수 변경 체크
         if (newWidth > 0 && newHeight > 0 &&
             (static_cast<UINT>(newWidth) != static_cast<UINT>(mViewportWidth) ||
                 static_cast<UINT>(newHeight) != static_cast<UINT>(mViewportHeight)))
         {
-            mViewportWidth = newWidth;
-            mViewportHeight = newHeight;
-            mRenderer.ResizeViewport(static_cast<UINT>(newWidth), static_cast<UINT>(newHeight));
+            mViewportWidth = static_cast<UINT>(newWidth);
+            mViewportHeight = static_cast<UINT>(newHeight);
+            mRenderer.ResizeViewport(mViewportWidth, mViewportHeight);
         }
         mViewportPosX = posX;
         mViewportPosY = posY;
 
-        // Gizmo는 뷰포트 좌표가 확정된 뒤 여기서 그림
+        // Gizmo
         if (scene)
         {
             if (CameraComponent* camComp = scene->GetMainCamera())
@@ -201,27 +202,14 @@ void Application::Run()
 
         if (scene)
         {
-            if (CameraComponent* camComp = scene->GetMainCamera())
-            {
-                mRenderer.BeginFrame(camComp->GetCamera(), scene->GetMainLight(), scene->GetPointLight(), scene->GetSpotLight());
-
-                for (auto& obj : scene->GetGameObjects())
-                {
-                    if (MeshRenderer* mr = obj->GetComponent<MeshRenderer>())
-                    {
-                        mr->Render(mRenderer);
-                    }
-                }
-
-                mRenderer.TransitionToSwapChain();
-            }
+            scene->RenderShadowPass(mRenderer);
+            scene->Render(mRenderer);
         }
 
         mRenderer.EndFrame();
         mInput.Update();
     }
 }
-
 void Application::Shutdown()
 {
     mImGuiLayer.Shutdown();

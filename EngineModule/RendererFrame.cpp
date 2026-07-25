@@ -115,8 +115,13 @@ void D3D12Renderer::BeginFrame(const Camera& camera, const DirectionalLight& dir
 {
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
 
-    SyncFrameViaRingBuffer(fr);
-    ResetCommandSession(fr);
+    if (!mIsCommandListRecording)
+    {
+        SyncFrameViaRingBuffer(fr);
+        ResetCommandSession(fr);
+        mIsCommandListRecording = true;
+    }
+
     ConfigureViewportRenderTarget();
     UpdateCameraConstantBuffer(fr, camera);
     UpdateLightConstantBuffer(fr, dirLight, pointLight, spotLight);
@@ -144,6 +149,8 @@ void D3D12Renderer::EndFrame()
 
     mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
     mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % kFrameCount;
+
+    mIsCommandListRecording = false;
 }
 
 void D3D12Renderer::WaitForGpu()

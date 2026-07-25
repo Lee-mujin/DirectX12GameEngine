@@ -15,3 +15,11 @@ void GameObject::Render(D3D12Renderer& renderer)
         c->Render(renderer);
     }
 }
+
+void GameObject::RenderShadow(D3D12Renderer& renderer)
+{
+    for (auto& c : mComponents)
+    {
+        c->RenderShadow(renderer);
+    }
+}
