@@ -90,14 +90,27 @@ void D3D12Renderer::UpdateCameraConstantBuffer(FrameResource& fr, const Camera& 
 void D3D12Renderer::UpdateLightConstantBuffer(FrameResource& fr, const DirectionalLight& dirLight, const PointLight& pointLight, const SpotLight& spotLight)
 {
     LightCBData lightData = {};
+
+    // Directional Light
     lightData.DirLightDirection = XMFLOAT3(dirLight.Direction.X, dirLight.Direction.Y, dirLight.Direction.Z);
     lightData.DirLightIntensity = dirLight.Intensity;
     lightData.DirLightColor = XMFLOAT3(dirLight.Color.X, dirLight.Color.Y, dirLight.Color.Z);
+
+    //저장된 멤버 변수에서 CBuffer 배열로 복사 (빨간줄 완전 제거)
+    for (UINT i = 0; i < kNumCascades; ++i)
+    {
+        XMStoreFloat4x4(&lightData.WorldLightViewProj[i], XMMatrixTranspose(D3D12RendererToXM(mCascadeLightViewProj[i])));
+    }
+    lightData.CascadeSplits = XMFLOAT4(mCascadeSplits.X, mCascadeSplits.Y, mCascadeSplits.Z, 0.0f);
+
+    // Point Light
     lightData.PointLightPosition = XMFLOAT3(pointLight.Position.X, pointLight.Position.Y, pointLight.Position.Z);
     lightData.PointLightIntensity = pointLight.Intensity;
     lightData.PointLightColor = XMFLOAT3(pointLight.Color.X, pointLight.Color.Y, pointLight.Color.Z);
     lightData.PointLightRange = pointLight.Range;
     lightData.PointLightEnabled = pointLight.Enabled ? 1 : 0;
+
+    // Spot Light
     lightData.SpotLightPosition = XMFLOAT3(spotLight.Position.X, spotLight.Position.Y, spotLight.Position.Z);
     lightData.SpotLightIntensity = spotLight.Intensity;
     lightData.SpotLightDirection = XMFLOAT3(spotLight.Direction.X, spotLight.Direction.Y, spotLight.Direction.Z);
@@ -106,8 +119,11 @@ void D3D12Renderer::UpdateLightConstantBuffer(FrameResource& fr, const Direction
     lightData.SpotLightInnerCos = cosf(Math::Deg2Rad(spotLight.InnerConeAngle));
     lightData.SpotLightOuterCos = cosf(Math::Deg2Rad(spotLight.OuterConeAngle));
     lightData.SpotLightEnabled = spotLight.Enabled ? 1 : 0;
-    memcpy(fr.lightCBMapped, &lightData, sizeof(lightData));
 
+    Matrix4x4 spotVP = spotLight.GetLightViewProj();
+    XMStoreFloat4x4(&lightData.SpotLightViewProj, XMMatrixTranspose(D3D12RendererToXM(spotVP)));
+
+    memcpy(fr.lightCBMapped, &lightData, sizeof(lightData));
     mCommandList->SetGraphicsRootConstantBufferView(2, fr.lightCB->GetGPUVirtualAddress());
 }
 

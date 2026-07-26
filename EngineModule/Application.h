@@ -25,6 +25,15 @@ public:
     void Run();
     void Shutdown();
     std::shared_ptr<GameObject> SpawnAssetIntoScene(AssetHandle handle);
+
+private:
+    //Application 역할별 초기화 세션 서브루틴
+    bool InitializeRenderer();
+    bool InitializeUI();
+    void InitializeResources();
+    void CreateDefaultScene();
+    void InitializeEditor();
+
 private:
     Window mWindow;
     Timer mTimer;
@@ -36,7 +45,7 @@ private:
     EditorState mEditorState;
     Hierarchy mHierarchy;
     Inspector mInspector;
-	Light mLight;
+    Light mLight;
     ContentBrowser mContentBrowser;
     Gizmo mGizmoPanel;
     UploadContext mUploadContext;

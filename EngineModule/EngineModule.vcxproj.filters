@@ -207,6 +207,12 @@
     <ClInclude Include="ShadowMap.h">
       <Filter>Graphics\h</Filter>
     </ClInclude>
+    <ClInclude Include="CSMCalculator.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderItem.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">

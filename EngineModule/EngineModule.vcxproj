@@ -166,6 +166,7 @@
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ContentBrowser.h" />
+    <ClInclude Include="CSMCalculator.h" />
     <ClInclude Include="DescriptorAllocator.h" />
     <ClInclude Include="DescriptorHandle.h" />
     <ClInclude Include="DirectionalLight.h" />
@@ -182,6 +183,7 @@
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="ModelUtility.h" />
     <ClInclude Include="PointLight.h" />
+    <ClInclude Include="RenderItem.h" />
     <ClInclude Include="RenderTarget.h" />
     <ClInclude Include="ResourceManager.h" />
     <ClInclude Include="RotatorComponent.h" />

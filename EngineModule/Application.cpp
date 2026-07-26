@@ -14,13 +14,32 @@ bool Application::Initialize(HINSTANCE hInstance)
     if (!mWindow.Create(hInstance, 1280, 720)) return false;
     mWindow.SetInput(&mInput);
 
+    if (!InitializeRenderer()) return false;
+    if (!InitializeUI()) return false;
+
+    InitializeResources();
+    CreateDefaultScene();
+    InitializeEditor();
+
+    mSceneManager.Initialize();
+
+    return true;
+}
+
+// 1. D3D12 렌더러 및 GPU 업로드 컨텍스트 초기화
+bool Application::InitializeRenderer()
+{
     if (!mRenderer.Initialize(mWindow.GetHWND(), mWindow.GetWidth(), mWindow.GetHeight())) return false;
 
     // 렌더러 CommandQueue 주입 제거, Device만 전달하여 내부 전용 CopyQueue 생성
     if (!mUploadContext.Initialize(mRenderer.GetDevice())) return false;
 
-    mTextureLoader.Initialize(mRenderer.GetDevice(), mRenderer.GetSrvAllocatorPtr(), &mUploadContext);
+    return true;
+}
 
+// 2. ImGui UI 레이어 세팅
+bool Application::InitializeUI()
+{
     // DescriptorHandle 단일 객체 반환 받기
     DescriptorHandle fontHandle = mRenderer.AllocateSrvSlot();
 
@@ -30,15 +49,24 @@ bool Application::Initialize(HINSTANCE hInstance)
         mRenderer.GetSrvAllocator().GetHeap(), fontHandle.CpuHandle, fontHandle.GpuHandle);
 
     mRenderer.SetImGuiLayer(&mImGuiLayer);
+    return true;
+}
+
+// 3. TextureLoader, ResourceManager, 기본 화이트 텍스처 초기화
+void Application::InitializeResources()
+{
+    mTextureLoader.Initialize(mRenderer.GetDevice(), mRenderer.GetSrvAllocatorPtr(), &mUploadContext);
 
     // ResourceManager에 세 개 모두 전달
     mResourceManager.Initialize(&mRenderer, &mTextureLoader, &mUploadContext);
 
-    //렌더러에 기본 흰색 텍스처 주입
+    // 렌더러에 기본 흰색 텍스처 주입
     mRenderer.SetDefaultWhiteTexture(mResourceManager.GetDefaultWhiteTexture());
+}
 
-    mSceneManager.Initialize();
-
+// 4. 초기 기본 카메라, 큐브 객체, 라이트 세팅
+void Application::CreateDefaultScene()
+{
     float aspect = static_cast<float>(mWindow.GetWidth()) / static_cast<float>(mWindow.GetHeight());
     auto scene = std::make_shared<Scene>();
 
@@ -66,18 +94,6 @@ bool Application::Initialize(HINSTANCE hInstance)
     cube->AddComponent<RotatorComponent>(90.0f);
     scene->AddGameObject(cube);
 
-    mContentBrowser.Initialize("Assets", [this](const std::filesystem::path& path)
-        {
-            AssetHandle handle = mResourceManager.GetOrCreateHandle(path.string());
-            SpawnAssetIntoScene(handle);
-        });
-
-    mHierarchy.SetOnAssetDropped([this](const std::filesystem::path& path)
-        {
-            AssetHandle handle = mResourceManager.GetOrCreateHandle(path.string());
-            SpawnAssetIntoScene(handle);
-        });
-
     scene->SetMainLight(DirectionalLight{ Vector3(0.3f, -0.8f, 0.5f), Vector3(1.0f, 1.0f, 1.0f), 1.0f });
 
     PointLight pointLight;
@@ -101,8 +117,22 @@ bool Application::Initialize(HINSTANCE hInstance)
 
     mSceneManager.ChangeScene(scene);
     mRenderer.WaitForGpu();
+}
 
-    return true;
+// 5. ContentBrowser 및 Hierarchy 콜백 초기화
+void Application::InitializeEditor()
+{
+    mContentBrowser.Initialize("Assets", [this](const std::filesystem::path& path)
+        {
+            AssetHandle handle = mResourceManager.GetOrCreateHandle(path.string());
+            SpawnAssetIntoScene(handle);
+        });
+
+    mHierarchy.SetOnAssetDropped([this](const std::filesystem::path& path)
+        {
+            AssetHandle handle = mResourceManager.GetOrCreateHandle(path.string());
+            SpawnAssetIntoScene(handle);
+        });
 }
 
 std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
@@ -119,7 +149,7 @@ std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
     auto obj = std::make_shared<GameObject>();
     obj->SetName(fsPath.stem().string());
 
-    //ModelUtility를 사용해 Mesh, Material 초기화, SourceHandle, Skinned/Static 구분을 한 번에 처리
+    // ModelUtility를 사용해 Mesh, Material 초기화, SourceHandle, Skinned/Static 구분을 한 번에 처리
     ModelUtility::ReplaceModel(*obj, model, handle);
 
     // 스키니드 모델 기본 스케일/회전 보정
@@ -174,16 +204,18 @@ void Application::Run()
         mInspector.Draw(mEditorState, mResourceManager);
         mContentBrowser.Draw();
 
-        float newWidth, newHeight, posX, posY;
+        float newWidth = 0.0f, newHeight = 0.0f, posX = 0.0f, posY = 0.0f;
         mViewport.Draw(mEditorState, mRenderer.GetViewportSrvHandle(), newWidth, newHeight, posX, posY);
 
-        // 뷰포트 정수 변경 체크
-        if (newWidth > 0 && newHeight > 0 &&
-            (static_cast<UINT>(newWidth) != static_cast<UINT>(mViewportWidth) ||
-                static_cast<UINT>(newHeight) != static_cast<UINT>(mViewportHeight)))
+        //뷰포트 변경 체크 시 float -> UINT 명시적 캐스팅으로 경고 제거
+        UINT uNewWidth = static_cast<UINT>(newWidth);
+        UINT uNewHeight = static_cast<UINT>(newHeight);
+
+        if (uNewWidth > 0 && uNewHeight > 0 &&
+            (uNewWidth != mViewportWidth || uNewHeight != mViewportHeight))
         {
-            mViewportWidth = static_cast<UINT>(newWidth);
-            mViewportHeight = static_cast<UINT>(newHeight);
+            mViewportWidth = uNewWidth;
+            mViewportHeight = uNewHeight;
             mRenderer.ResizeViewport(mViewportWidth, mViewportHeight);
         }
         mViewportPosX = posX;
@@ -194,7 +226,7 @@ void Application::Run()
         {
             if (CameraComponent* camComp = scene->GetMainCamera())
             {
-                mGizmoPanel.Draw(mEditorState, camComp->GetCamera(), mViewportPosX, mViewportPosY, mViewportWidth, mViewportHeight);
+                mGizmoPanel.Draw(mEditorState, camComp->GetCamera(), mViewportPosX, mViewportPosY, static_cast<float>(mViewportWidth), static_cast<float>(mViewportHeight));
             }
         }
 
@@ -210,6 +242,7 @@ void Application::Run()
         mInput.Update();
     }
 }
+
 void Application::Shutdown()
 {
     mImGuiLayer.Shutdown();

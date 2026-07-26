@@ -54,7 +54,10 @@ void Scene::ClearAssetObjects()
 
 void Scene::RenderShadowPass(D3D12Renderer& renderer)
 {
-    renderer.BeginShadowPass(mMainLight);
+    if (!mMainCamera) return;
+
+    //메인 카메라 정보를 함께 넘겨서 CSM 계산이 가능하도록 인자 추가
+    renderer.BeginShadowPass(mMainLight, mMainCamera->GetCamera());
 
     for (auto& obj : mObjects)
     {

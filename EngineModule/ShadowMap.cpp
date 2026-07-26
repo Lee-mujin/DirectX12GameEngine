@@ -13,7 +13,8 @@ bool ShadowMap::Initialize(ID3D12Device* device, DescriptorAllocator* dsvAllocat
     desc.Height = size;
     desc.DepthOrArraySize = 1;
     desc.MipLevels = 1;
-    desc.Format = DXGI_FORMAT_R32_TYPELESS;
+    //R32_TYPELESS 대신 D32_FLOAT로 직접 지정하여 ClearValue 및 PSO DSVFormat과 1:1 완벽 일치
+    desc.Format = DXGI_FORMAT_D32_FLOAT;
     desc.SampleDesc.Count = 1;
     desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
@@ -75,8 +76,10 @@ void ShadowMap::Begin(ID3D12GraphicsCommandList* cmd)
     cmd->RSSetViewports(1, &mViewport);
     cmd->RSSetScissorRects(1, &mScissorRect);
 
-    cmd->ClearDepthStencilView(mDsvHandle.CpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-    cmd->OMSetRenderTargets(0, nullptr, FALSE, &mDsvHandle.CpuHandle);
+    //ShadowMap의 D32_FLOAT 전용 DSV CPU Handle을 명시적 전달
+    D3D12_CPU_DESCRIPTOR_HANDLE dsvCpuHandle = mDsvHandle.CpuHandle;
+    cmd->OMSetRenderTargets(0, nullptr, FALSE, &dsvCpuHandle);
+    cmd->ClearDepthStencilView(dsvCpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 }
 
 void ShadowMap::End(ID3D12GraphicsCommandList* cmd)

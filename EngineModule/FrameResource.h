@@ -14,13 +14,16 @@ struct ObjectCBData
     DirectX::XMFLOAT3 Pad0;
 };
 
-struct CameraCBData //카메라 위치
+struct CameraCBData
 {
     DirectX::XMFLOAT4X4 View;
     DirectX::XMFLOAT4X4 Proj;
     DirectX::XMFLOAT3 CameraPosition;
     float Pad0;
 };
+
+//CSM 캐스케이드 개수
+static constexpr UINT kNumCascades = 3;
 
 struct LightCBData
 {
@@ -29,7 +32,13 @@ struct LightCBData
     float DirLightIntensity;
     DirectX::XMFLOAT3 DirLightColor;
     float Pad0;
-    //필드 순서를 재배치해서 float3 + float 짝으로 16바이트씩 맞춤, Pad 정렬 맞추기용 더미
+
+    //Directional Light 전용 Cascade ViewProj 행렬 3개
+    DirectX::XMFLOAT4X4 WorldLightViewProj[kNumCascades];
+
+    //Cascade 분할 거리 (x: Near, y: Mid, z: Far)
+    DirectX::XMFLOAT4 CascadeSplits;
+
     // Point Light
     DirectX::XMFLOAT3 PointLightPosition;
     float PointLightIntensity;
@@ -45,10 +54,12 @@ struct LightCBData
     DirectX::XMFLOAT3 SpotLightDirection;
     float SpotLightRange;
     DirectX::XMFLOAT3 SpotLightColor;
-    float SpotLightInnerCos; //cos(InnerConeAngle) 값을 CPU에서 미리 계산해서 넘김
-    float SpotLightOuterCos; //cos(OuterConeAngle)
+    float SpotLightInnerCos;
+    float SpotLightOuterCos;
     int SpotLightEnabled;
-    DirectX::XMFLOAT2 Pad2;
+
+    // Spot Light ViewProj 행렬
+    DirectX::XMFLOAT4X4 SpotLightViewProj;
 };
 
 struct ShadowCBData
@@ -58,7 +69,7 @@ struct ShadowCBData
 
 static constexpr UINT MAX_BONES = 96;
 
-struct BoneCBData //BoneCB 추가
+struct BoneCBData
 {
     DirectX::XMFLOAT4X4 BoneMatrices[MAX_BONES];
 };
@@ -88,5 +99,5 @@ public:
     UINT8* shadowCBMapped = nullptr;
     UINT shadowCBStride = 0;
 
-    UINT64 fenceValue = 0; //이 FrameResource를 마지막으로 쓴 프레임의 fence 값
+    UINT64 fenceValue = 0;
 };

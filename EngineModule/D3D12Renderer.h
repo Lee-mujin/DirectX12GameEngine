@@ -13,7 +13,28 @@
 #include "ShadowMap.h"
 #include "MathUtil.h"
 #include "Matrix4x4.h"
+#include "Vector3.h"
+#include "RenderItem.h"
+
 using Microsoft::WRL::ComPtr;
+
+//루트 슬롯 번호 enum으로 상수화
+enum class RootSlot : UINT
+{
+    ObjectCB = 0,
+    CameraCB = 1,
+    LightCB = 2,
+    BoneCB = 3,
+    BaseTexture = 4,
+    NormalTexture = 5,
+    ShadowTexture = 6
+};
+
+enum class ShadowRootSlot : UINT
+{
+    ShadowCB = 0,
+    BoneCB = 1
+};
 
 class Mesh;
 class Material;
@@ -42,6 +63,10 @@ public:
     void BeginFrame(const Camera& camera, const DirectionalLight& dirLight, const PointLight& pointLight, const SpotLight& spotLight);
     void DrawMesh(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix);
     void DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
+
+    //RenderItem 기반 드로우 함수 추가
+    void DrawRenderItem(const RenderItem& item);
+
     void EndFrame();
 
     void SetImGuiLayer(ImGuiLayer* layer) { mImGuiLayer = layer; }
@@ -60,20 +85,36 @@ public:
 
     bool InitializeShadowMap(); // Initialize() 안에서 호출
     void RenderShadowPass(const DirectionalLight& light, const std::vector<std::pair<const Mesh*, Matrix4x4>>& staticDrawList
-        /* 스키닝 드로우 목록도 필요하면 별도 오버로드 또는 구조체로 */);
-    void BeginShadowPass(const DirectionalLight& light);
+    /* 스키닝 드로우 목록도 필요하면 별도 오버로드 또는 구조체로 */);
+    void BeginShadowPass(const DirectionalLight& light, const Camera& camera);
     void DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix);
     void DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
     void EndShadowPass();
 
     Matrix4x4 GetLightViewProj() const { return mLightViewProj; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetShadowMapSRV() const { return mShadowMap.GetSRV(); }
+
 private:
-    void InitializeCoreContext();
+    //Initialize 도메인 모듈화 함수들
+    void InitializeDevice();
+    void InitializeFrameResources();
+    void InitializeDescriptors();
     void InitializeRenderTargets();
-    void InitializeShadersAndPipelines();
+    void InitializePipeline();
 
     void CompileShaderInternal(const std::wstring& filename, const char* entryPoint, const char* target, ID3DBlob** shaderBlob);
+
+    //DrawMeshInternal 서브루틴 분리 함수 선언
+    void BindMaterial(const Material& material, bool hasNormalMap);
+    void UploadObjectCB(const Material& material, const Matrix4x4& worldMatrix, bool hasNormalMap);
+    void UploadBoneCB(const BoneCBData* boneData);
+    void DrawGeometry(const Mesh& mesh);
+
+    //RenderItem 전용 서브루틴 선언
+    void BindItemTextures(const RenderItem& item);
+    void UploadObjectCB(const RenderItem& item);
+    void UploadBoneCB(const std::vector<Matrix4x4>* boneMatrices);
+
     void DrawMeshInternal(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const BoneCBData* boneData, ID3D12PipelineState* pso);
 
     void SyncFrameViaRingBuffer(FrameResource& fr);
@@ -164,6 +205,9 @@ private:
     Matrix4x4 mLightViewProj; //Main Pass 셰이더에 넘길 때 씀
 
     bool mIsCommandListRecording = false;
+
+    Matrix4x4 mCascadeLightViewProj[3];
+    Vector3 mCascadeSplits;
 
     float mClearColor[4] = { 0.0f, 0.2f, 0.6f, 1.0f };
 };

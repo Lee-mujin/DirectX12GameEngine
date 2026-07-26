@@ -7,52 +7,66 @@ bool D3D12Renderer::Initialize(HWND hwnd, UINT width, UINT height)
     mWidth = width;
     mHeight = height;
 
-    InitializeCoreContext();
+    InitializeDevice();
+    InitializeFrameResources();
+    InitializeDescriptors();
     InitializeRenderTargets();
-    InitializeShadersAndPipelines();
+    InitializePipeline();
 
     return true;
 }
 
-bool D3D12Renderer::InitializeShadowMap()
-{
-    // ShadowMap 초기화 (Descriptor Heap 슬롯 안전 할당)
-    return mShadowMap.Initialize(mDevice.Get(), &mDsvAllocator, &mSrvAllocator, 2048);
-}
-
-void D3D12Renderer::InitializeCoreContext()
+// 1. 하드웨어 디바이스, 큐, 펜스 생성
+void D3D12Renderer::InitializeDevice()
 {
     CreateFactory();
     CreateDevice();
     CreateCommandQueue();
-    CreateFrameResources();
-    CreateCommandList();
     CreateFence();
-    CreateSwapChain();
 }
 
-void D3D12Renderer::InitializeRenderTargets()
+// 2. 프레임 리소스 버퍼 및 커맨드 리스트 초기화
+void D3D12Renderer::InitializeFrameResources()
 {
-    // Allocator 안전 초기화 (DSV Heap은 메인 DSV + ShadowMap DSV 수용을 위해 4개로 지정)
+    CreateFrameResources();
+    CreateCommandList();
+}
+
+// 3. 디스크립터 할당자 Heap 초기화
+void D3D12Renderer::InitializeDescriptors()
+{
+    // Allocator 안전 초기화 (DSV Heap 개수를 8개로 늘려 슬롯 겹침 방지)
     mSrvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSrvCount, true);
     mRtvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kFrameCount + 1, false);
-    mDsvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 4, false);
+    mDsvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 8, false); //8개로 확장
+}
 
+// 4. 스왑체인, 백버퍼 RTV, 메인/섀도우 DSV 및 뷰포트 생성
+void D3D12Renderer::InitializeRenderTargets()
+{
+    CreateSwapChain();
     CreateRenderTargetViews();
-    CreateDepthStencil(); // 0번 슬롯: 메인 Depth Stencil View
+    CreateDepthStencil(); // 0번 슬롯: 메인 Depth Stencil View (D24_UNORM_S8_UINT)
 
-    // Depth Stencil 생성 완료 후 안전하게 ShadowMap 초기화 (1번 슬롯 사용)
+    // Depth Stencil 생성 완료 후 1번 슬롯에 ShadowMap (D32_FLOAT) 생성
     InitializeShadowMap();
 
     SetupViewport();
     InitializeViewport(1280, 720);
 }
 
-void D3D12Renderer::InitializeShadersAndPipelines()
+// 5. 파이프라인(셰이더, 루트시그니처, PSO) 구축
+void D3D12Renderer::InitializePipeline()
 {
     CreateShader();
     CreateRootSignature();
     CreatePSOs();
+}
+
+bool D3D12Renderer::InitializeShadowMap()
+{
+    // ShadowMap 초기화 (Descriptor Heap 슬롯 안전 할당)
+    return mShadowMap.Initialize(mDevice.Get(), &mDsvAllocator, &mSrvAllocator, 2048);
 }
 
 void D3D12Renderer::CreateFactory()
@@ -156,7 +170,8 @@ void D3D12Renderer::CreateDepthStencil()
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
     // DSV 할당자의 Start 위치에 메인 DepthStencilView 생성
-    mDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, mDsvAllocator.GetHeap()->GetCPUDescriptorHandleForHeapStart());
+    DescriptorHandle mainDsvHandle = mDsvAllocator.Allocate();
+    mDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, mainDsvHandle.CpuHandle);
 }
 
 void D3D12Renderer::SetupViewport()
@@ -187,29 +202,43 @@ void D3D12Renderer::CreateShader()
 
 void D3D12Renderer::CreateRootSignature()
 {
+    // Main Pass Descriptor Ranges
     CD3DX12_DESCRIPTOR_RANGE srvRangeBase;
-    srvRangeBase.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+    srvRangeBase.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); //BaseColor
 
     CD3DX12_DESCRIPTOR_RANGE srvRangeNormal;
-    srvRangeNormal.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+    srvRangeNormal.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); //NormalMap
 
-    CD3DX12_ROOT_PARAMETER rootParams[6];
-    rootParams[0].InitAsConstantBufferView(0);
-    rootParams[1].InitAsConstantBufferView(1);
-    rootParams[2].InitAsConstantBufferView(2);
-    rootParams[3].InitAsConstantBufferView(3);
+    CD3DX12_DESCRIPTOR_RANGE srvRangeShadow;
+    srvRangeShadow.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2); //ShadowMap
+
+    CD3DX12_ROOT_PARAMETER rootParams[7];
+    rootParams[0].InitAsConstantBufferView(0); //ObjectCB
+    rootParams[1].InitAsConstantBufferView(1); //CameraCB
+    rootParams[2].InitAsConstantBufferView(2); //LightCB
+    rootParams[3].InitAsConstantBufferView(3); //BoneCB
     rootParams[4].InitAsDescriptorTable(1, &srvRangeBase, D3D12_SHADER_VISIBILITY_PIXEL);
     rootParams[5].InitAsDescriptorTable(1, &srvRangeNormal, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootParams[6].InitAsDescriptorTable(1, &srvRangeShadow, D3D12_SHADER_VISIBILITY_PIXEL);
 
-    D3D12_STATIC_SAMPLER_DESC sampler = {};
-    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-    sampler.ShaderRegister = 0;
-    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    //일반 텍스처용
+    D3D12_STATIC_SAMPLER_DESC samplers[2] = {};
+    samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    samplers[0].AddressU = samplers[0].AddressV = samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    samplers[0].ShaderRegister = 0;
+    samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    //섀도우 Depth 비교 샘플러
+    samplers[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+    samplers[1].AddressU = samplers[1].AddressV = samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    samplers[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE; //영역 밖은 그림자 안 생김
+    samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    samplers[1].ShaderRegister = 1;
+    samplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc;
-    rootSigDesc.Init(_countof(rootParams), rootParams, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    rootSigDesc.Init(_countof(rootParams), rootParams, _countof(samplers), samplers, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
     ComPtr<ID3DBlob> signatureBlob, errorBlob;
     ThrowIfFailed(D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob));
@@ -250,7 +279,9 @@ void D3D12Renderer::CreatePipelineState(ID3DBlob* vsBlob, ID3DBlob* psBlob, ID3D
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     if (isShadowPSO)
     {
+        //가파른 경사면 정밀 보정을 위한 하드웨어 바이어스
         psoDesc.RasterizerState.DepthBias = 1000;
+        psoDesc.RasterizerState.DepthBiasClamp = 0.0f;
         psoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     }
 
