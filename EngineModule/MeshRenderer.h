@@ -1,26 +1,30 @@
 #pragma once
 #include <memory>
 #include "Component.h"
+#include "MaterialInstance.h"
 
 class Mesh;
 class Material;
 class SkinnedMesh;
+class RenderQueue;
 
 class MeshRenderer : public Component
 {
 public:
     void SetMesh(std::shared_ptr<Mesh> mesh);
-    void SetMaterial(std::shared_ptr<Material> material) { mMaterial = material; }
 
-    void Render(D3D12Renderer& renderer) override;
-    void RenderShadow(D3D12Renderer& renderer) override;
+    //Material 설정 시 내부적으로 MaterialInstance 자동 바인딩
+    void SetMaterial(std::shared_ptr<Material> material);
+    void SetMaterialInstance(const MaterialInstance& matInst) { mMaterialInstance = matInst; }
 
-    std::shared_ptr<Material> GetMaterial() const { return mMaterial; }
+    MaterialInstance& GetMaterialInstance() { return mMaterialInstance; }
+    const MaterialInstance& GetMaterialInstance() const { return mMaterialInstance; }
+
+    void SubmitRenderItem(RenderQueue& renderQueue);
 
 private:
     std::shared_ptr<Mesh> mMesh;
-    std::shared_ptr<Material> mMaterial;
-    
-    //캐싱용 멤버 변수 추가
-    std::shared_ptr<SkinnedMesh> mSkinnedMesh; 
+    MaterialInstance mMaterialInstance; //개별 오버라이드가 가능한 MaterialInstance 보유
+
+    std::shared_ptr<SkinnedMesh> mSkinnedMesh;
 };

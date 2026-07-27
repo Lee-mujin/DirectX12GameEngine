@@ -1,52 +1,59 @@
 #include "pch.h"
 #include "MeshRenderer.h"
 #include "GameObject.h"
-#include "D3D12Renderer.h"
+#include "RenderQueue.h"
+#include "Mesh.h"
 #include "SkinnedMesh.h"
+#include "Material.h"
+#include "Texture.h"
 #include "AnimatorComponent.h"
 
 void MeshRenderer::SetMesh(std::shared_ptr<Mesh> mesh)
 {
     mMesh = mesh;
-
-    //메쉬가 세팅되는 최초 시점에 한번만 타입 체크
     mSkinnedMesh = std::dynamic_pointer_cast<SkinnedMesh>(mesh);
 }
 
-void MeshRenderer::Render(D3D12Renderer& renderer)
+void MeshRenderer::SetMaterial(std::shared_ptr<Material> material)
 {
-    if (!mMesh || !mMaterial) return;
-
-    //dynamic_cast 없이 널 체크만으로 빠르게 판별합니다.
-    if (mSkinnedMesh)
-    {
-        AnimatorComponent* animator = GetOwner()->GetComponent<AnimatorComponent>();
-
-        static const std::vector<Matrix4x4> kIdentityFallback;
-        const std::vector<Matrix4x4>& boneMatrices = animator ? animator->GetFinalBoneMatrices() : kIdentityFallback;
-
-        //mSkinnedMesh 포인터를 그대로 전달
-        renderer.DrawSkinnedMesh(*mSkinnedMesh, *mMaterial, GetOwner()->GetTransform().GetMatrix(), boneMatrices);
-    }
-    else
-    {
-        renderer.DrawMesh(*mMesh, *mMaterial, GetOwner()->GetTransform().GetMatrix());
-    }
+    mMaterialInstance = MaterialInstance(material);
 }
 
-void MeshRenderer::RenderShadow(D3D12Renderer& renderer)
+void MeshRenderer::SubmitRenderItem(RenderQueue& renderQueue)
 {
-    if (!mMesh) return; // Material 필요 없음, Shadow Pass는 Depth만
+    if (!mMesh) return;
 
-    if (auto skinnedMesh = std::dynamic_pointer_cast<SkinnedMesh>(mMesh))
+    RenderItem item;
+    item.WorldMatrix = GetOwner()->GetTransform().GetMatrix();
+    item.BaseColor = mMaterialInstance.GetBaseColor();
+    item.Shininess = mMaterialInstance.GetShininess();
+
+    //Base Texture GPU 핸들 추출 (MaterialInstance 오버라이드 지원)
+    if (auto baseTex = mMaterialInstance.GetTexture())
     {
-        AnimatorComponent* animator = GetOwner()->GetComponent<AnimatorComponent>();
-        static const std::vector<Matrix4x4> kEmpty;
-        const auto& boneMatrices = animator ? animator->GetFinalBoneMatrices() : kEmpty;
-        renderer.DrawShadowSkinnedMesh(*skinnedMesh, GetOwner()->GetTransform().GetMatrix(), boneMatrices);
+        item.BaseTextureHandle = baseTex->GetSrvHandle();
+    }
+
+    //Normal Map GPU 핸들 추출
+    if (auto normTex = mMaterialInstance.GetNormalTexture())
+    {
+        item.NormalTextureHandle = normTex->GetSrvHandle();
+        item.HasNormalMap = true;
+    }
+
+    //Skinned Mesh 및 Bone Matrix 세팅
+    if (mSkinnedMesh)
+    {
+        item.SkinnedMeshPtr = mSkinnedMesh.get();
+        if (AnimatorComponent* animator = GetOwner()->GetComponent<AnimatorComponent>())
+        {
+            item.BoneMatrices = &animator->GetFinalBoneMatrices();
+        }
     }
     else
     {
-        renderer.DrawShadowMesh(*mMesh, GetOwner()->GetTransform().GetMatrix());
+        item.MeshPtr = mMesh.get();
     }
+
+    renderQueue.Add(item);
 }

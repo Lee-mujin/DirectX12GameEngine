@@ -10,13 +10,14 @@
 #include "Animation.h"
 #include "Model.h"
 
-const std::string ResourceManager::kEmptyPath = "";
-
 void ResourceManager::Initialize(D3D12Renderer* renderer, TextureLoader* textureLoader, UploadContext* uploadContext)
 {
     mRenderer = renderer;
     mTextureLoader = textureLoader;
     mUploadContext = uploadContext;
+
+    // AssetDatabase 기본 폴더 스캔 초기화
+    mAssetDB.Initialize("Assets");
 }
 
 std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
@@ -80,34 +81,17 @@ std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
 
 std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::wstring& path)
 {
+    if (!mTextureLoader) return nullptr;
     return mTextureLoader->LoadTextureFromFile(path);
 }
 
 std::shared_ptr<Texture> ResourceManager::GetDefaultWhiteTexture()
 {
-    if (!mDefaultWhiteTexture)
+    if (!mDefaultWhiteTexture && mTextureLoader)
     {
         mDefaultWhiteTexture = mTextureLoader->CreateSolidColorTexture(255, 255, 255, 255);
     }
     return mDefaultWhiteTexture;
-}
-
-AssetHandle ResourceManager::GetOrCreateHandle(const std::string& path)
-{
-    auto it = mPathToId.find(path);
-    if (it != mPathToId.end()) return AssetHandle(it->second);
-
-    uint32_t id = mNextHandleId++;
-    mPathToId[path] = id;
-    mIdToPath[id] = path;
-
-    return AssetHandle(id);
-}
-
-const std::string& ResourceManager::GetPath(AssetHandle handle) const
-{
-    auto it = mIdToPath.find(handle.GetId());
-    return (it != mIdToPath.end()) ? it->second : kEmptyPath;
 }
 
 std::shared_ptr<Model> ResourceManager::GetOrLoadModel(AssetHandle handle)
@@ -145,15 +129,7 @@ std::shared_ptr<Model> ResourceManager::GetOrLoadModel(AssetHandle handle)
 void ResourceManager::RemapAsset(AssetHandle handle, const std::string& newPath)
 {
     if (!handle.IsValid()) return;
-
-    auto oldPathIt = mIdToPath.find(handle.GetId());
-    if (oldPathIt != mIdToPath.end())
-    {
-        mPathToId.erase(oldPathIt->second);
-    }
-
-    mIdToPath[handle.GetId()] = newPath;
-    mPathToId[newPath] = handle.GetId();
+    mAssetDB.RegisterOrGetHandle(newPath);
     mModelCache.erase(handle.GetId());
 }
 
@@ -186,32 +162,4 @@ std::shared_ptr<Texture> ResourceManager::GetOrLoadTexture(AssetHandle handle)
     }
 
     return texture;
-}
-
-//현재는 확장자 기반이나 추후 Metadata 기반(return metadata.Type)으로 교체
-AssetType ResourceManager::GetAssetType(AssetHandle handle) const
-{
-    if (!handle.IsValid()) return AssetType::Unknown;
-
-    const std::string& pathStr = GetPath(handle);
-    if (pathStr.empty()) return AssetType::Unknown;
-
-    std::filesystem::path path(pathStr);
-    std::string ext = path.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".dds" || ext == ".tga")
-    {
-        return AssetType::Texture;
-    }
-    else if (ext == ".gltf" || ext == ".glb" || ext == ".fbx" || ext == ".obj")
-    {
-        return AssetType::Model;
-    }
-    else if (ext == ".txt" || ext == ".json" || ext == ".scene")
-    {
-        return AssetType::Scene;
-    }
-
-    return AssetType::Unknown;
 }

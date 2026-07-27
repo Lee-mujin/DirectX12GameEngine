@@ -15,14 +15,6 @@ void SceneManager::Update(Input* input, float deltaTime)
     }
 }
 
-void SceneManager::Render(D3D12Renderer& renderer)
-{
-    if (mCurrentScene)
-    {
-        mCurrentScene->Render(renderer);
-    }
-}
-
 void SceneManager::ChangeScene(std::shared_ptr<Scene> scene)
 {
     mCurrentScene = scene;

@@ -17,6 +17,7 @@
 #include "Viewport.h"
 #include "UploadContext.h"
 #include "TextureLoader.h"
+#include "RenderPipeline.h"
 
 class Application
 {
@@ -33,6 +34,7 @@ private:
     void InitializeResources();
     void CreateDefaultScene();
     void InitializeEditor();
+    void SetupRenderPipeline();
 
 private:
     Window mWindow;
@@ -50,6 +52,7 @@ private:
     Gizmo mGizmoPanel;
     UploadContext mUploadContext;
     TextureLoader mTextureLoader;
+    RenderPipeline mRenderPipeline;
 
     Viewport mViewport;
     float mViewportWidth = 1280.0f;

@@ -3,6 +3,8 @@
 #include "EditorState.h"
 #include "Transform.h"
 #include "MeshRenderer.h"
+#include "MaterialInstance.h"
+#include "Material.h"
 #include "Texture.h"
 #include "imgui.h"
 #include "Animation.h"
@@ -75,91 +77,93 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
         }
     }
 
-    // 2. Material 영역
+    // 2. Material 영역 (✨ MaterialInstance 오버라이드 지원)
     if (MeshRenderer* meshRenderer = selected->GetComponent<MeshRenderer>())
     {
         ImGui::PushID("MaterialComponent");
 
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            auto material = meshRenderer->GetMaterial();
-            if (material)
+            // MeshRenderer로부터 MaterialInstance 참조 획득
+            MaterialInstance& matInst = meshRenderer->GetMaterialInstance();
+            std::shared_ptr<Material> parentMat = matInst.GetParent();
+
+            Vector3 baseColor = matInst.GetBaseColor();
+            if (ImGui::ColorEdit3("Base Color", &baseColor.X))
             {
-                Vector3 baseColor = material->GetBaseColor();
-                if (ImGui::ColorEdit3("Base Color", &baseColor.X))
-                {
-                    material->SetBaseColor(baseColor);
-                }
+                matInst.SetBaseColor(baseColor);
+            }
 
-                float metallic = material->GetMetallic();
-                if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f))
-                {
-                    material->SetMetallic(metallic);
-                }
+            float metallic = parentMat ? parentMat->GetMetallic() : 0.0f;
+            if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f))
+            {
+                if (parentMat) parentMat->SetMetallic(metallic);
+            }
 
-                float roughness = material->GetRoughness();
-                if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f))
-                {
-                    material->SetRoughness(roughness);
-                }
+            float roughness = parentMat ? parentMat->GetRoughness() : 0.5f;
+            if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f))
+            {
+                if (parentMat) parentMat->SetRoughness(roughness);
+            }
 
-                float shininess = material->GetShininess();
-                if (ImGui::DragFloat("Shininess", &shininess, 1.0f, 1.0f, 256.0f))
-                {
-                    material->SetShininess(shininess);
-                }
+            float shininess = matInst.GetShininess();
+            if (ImGui::DragFloat("Shininess", &shininess, 1.0f, 1.0f, 256.0f))
+            {
+                matInst.SetShininess(shininess);
+            }
 
-                // Base Color Texture
-                auto texture = material->GetBaseColorTexture();
-                if (texture)
-                {
-                    ImGui::Text("Base Color Texture:");
-                    ImGui::Image((ImTextureID)texture->GetSrvHandle().ptr, ImVec2(64, 64));
-                }
-                else
-                {
-                    ImGui::Text("Base Color Texture: (None)");
-                    ImGui::Dummy(ImVec2(64, 64));
-                }
+            // Base Color Texture
+            auto texture = matInst.GetTexture();
+            if (texture)
+            {
+                ImGui::Text("Base Color Texture:");
+                ImGui::Image((ImTextureID)texture->GetSrvHandle().ptr, ImVec2(64, 64));
+            }
+            else
+            {
+                ImGui::Text("Base Color Texture: (None)");
+                ImGui::Dummy(ImVec2(64, 64));
+            }
 
-                // Base Color Texture 드롭 처리 (AssetHandle 함께 보관)
-                if (auto handleOpt = HandleAssetDropTarget(resourceManager))
+            // Base Color Texture 드롭 처리 (AssetHandle 함께 보관)
+            if (auto handleOpt = HandleAssetDropTarget(resourceManager))
+            {
+                if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
                 {
-                    if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
+                    auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt);
+                    if (newTexture)
                     {
-                        auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt);
-                        if (newTexture)
-                        {
-                            material->SetBaseColorTexture(newTexture, *handleOpt);
-                        }
+                        matInst.SetTexture(newTexture);
+                        if (parentMat) parentMat->SetBaseColorTexture(newTexture, *handleOpt);
                     }
                 }
+            }
 
-                ImGui::Separator();
+            ImGui::Separator();
 
-                // Normal Map
-                auto normalTexture = material->GetNormalTexture();
-                if (normalTexture)
-                {
-                    ImGui::Text("Normal Map:");
-                    ImGui::Image((ImTextureID)normalTexture->GetSrvHandle().ptr, ImVec2(64, 64));
-                }
-                else
-                {
-                    ImGui::Text("Normal Map: (None)");
-                    ImGui::Dummy(ImVec2(64, 64));
-                }
+            // Normal Map
+            auto normalTexture = matInst.GetNormalTexture();
+            if (normalTexture)
+            {
+                ImGui::Text("Normal Map:");
+                ImGui::Image((ImTextureID)normalTexture->GetSrvHandle().ptr, ImVec2(64, 64));
+            }
+            else
+            {
+                ImGui::Text("Normal Map: (None)");
+                ImGui::Dummy(ImVec2(64, 64));
+            }
 
-                // Normal Map 드롭 처리 (AssetHandle 함께 보관)
-                if (auto handleOpt = HandleAssetDropTarget(resourceManager))
+            // Normal Map 드롭 처리 (AssetHandle 함께 보관)
+            if (auto handleOpt = HandleAssetDropTarget(resourceManager))
+            {
+                if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
                 {
-                    if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
+                    auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt);
+                    if (newTexture)
                     {
-                        auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt);
-                        if (newTexture)
-                        {
-                            material->SetNormalTexture(newTexture, *handleOpt);
-                        }
+                        matInst.SetNormalTexture(newTexture);
+                        if (parentMat) parentMat->SetNormalTexture(newTexture, *handleOpt);
                     }
                 }
             }

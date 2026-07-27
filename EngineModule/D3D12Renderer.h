@@ -15,6 +15,7 @@
 #include "Matrix4x4.h"
 #include "Vector3.h"
 #include "RenderItem.h"
+#include "RenderQueue.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -90,6 +91,9 @@ public:
     void DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix);
     void DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
     void EndShadowPass();
+
+    void Render(const RenderQueue& renderQueue);
+    void RenderShadow(const RenderQueue& renderQueue);
 
     Matrix4x4 GetLightViewProj() const { return mLightViewProj; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetShadowMapSRV() const { return mShadowMap.GetSRV(); }

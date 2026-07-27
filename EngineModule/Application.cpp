@@ -8,6 +8,9 @@
 #include "Model.h"
 #include "SceneSerializer.h"
 #include "ModelUtility.h"
+#include "ShadowPass.h"
+#include "GeometryPass.h"
+#include "UIPass.h"
 
 bool Application::Initialize(HINSTANCE hInstance)
 {
@@ -21,9 +24,21 @@ bool Application::Initialize(HINSTANCE hInstance)
     CreateDefaultScene();
     InitializeEditor();
 
+    // 렌더 파이프라인 패스 구성 (ShadowPass -> GeometryPass -> UIPass)
+    SetupRenderPipeline();
+
     mSceneManager.Initialize();
 
     return true;
+}
+
+// RenderPipeline에 파이프라인 패스 등록
+void Application::SetupRenderPipeline()
+{
+    mRenderPipeline.ClearPasses();
+    mRenderPipeline.AddPass<ShadowPass>();
+    mRenderPipeline.AddPass<GeometryPass>();
+    mRenderPipeline.AddPass<UIPass>();
 }
 
 // 1. D3D12 렌더러 및 GPU 업로드 컨텍스트 초기화
@@ -207,16 +222,19 @@ void Application::Run()
         float newWidth = 0.0f, newHeight = 0.0f, posX = 0.0f, posY = 0.0f;
         mViewport.Draw(mEditorState, mRenderer.GetViewportSrvHandle(), newWidth, newHeight, posX, posY);
 
-        //뷰포트 변경 체크 시 float -> UINT 명시적 캐스팅으로 경고 제거
+        // 뷰포트 변경 체크 시 float <-> UINT 명시적 형변환으로 C4244 / C4267 경고 완벽 보정
         UINT uNewWidth = static_cast<UINT>(newWidth);
         UINT uNewHeight = static_cast<UINT>(newHeight);
 
+        float fCurrentWidth = static_cast<float>(mViewportWidth);
+        float fCurrentHeight = static_cast<float>(mViewportHeight);
+
         if (uNewWidth > 0 && uNewHeight > 0 &&
-            (uNewWidth != mViewportWidth || uNewHeight != mViewportHeight))
+            (newWidth != fCurrentWidth || newHeight != fCurrentHeight))
         {
-            mViewportWidth = uNewWidth;
-            mViewportHeight = uNewHeight;
-            mRenderer.ResizeViewport(mViewportWidth, mViewportHeight);
+            mViewportWidth = static_cast<float>(uNewWidth);
+            mViewportHeight = static_cast<float>(uNewHeight);
+            mRenderer.ResizeViewport(uNewWidth, uNewHeight);
         }
         mViewportPosX = posX;
         mViewportPosY = posY;
@@ -226,19 +244,40 @@ void Application::Run()
         {
             if (CameraComponent* camComp = scene->GetMainCamera())
             {
-                mGizmoPanel.Draw(mEditorState, camComp->GetCamera(), mViewportPosX, mViewportPosY, static_cast<float>(mViewportWidth), static_cast<float>(mViewportHeight));
+                mGizmoPanel.Draw(mEditorState, camComp->GetCamera(), mViewportPosX, mViewportPosY, mViewportWidth, mViewportHeight);
             }
         }
 
         mSceneManager.Update(&mInput, deltaTime);
 
-        if (scene)
+        // RenderPipeline 실행부
+        if (scene && scene->GetMainCamera())
         {
-            scene->RenderShadowPass(mRenderer);
-            scene->Render(mRenderer);
+            // RenderQueue 수집
+            RenderQueue queue;
+            scene->BuildRenderQueue(queue);
+
+            // 패스 실행용 Context 구성
+            RenderContext context;
+            context.Renderer = &mRenderer;
+            context.Queue = &queue;
+            context.MainCamera = &scene->GetMainCamera()->GetCamera();
+            context.DirLight = &scene->GetMainLight();
+            context.PointLight = &scene->GetPointLight();
+            context.SpotLight = &scene->GetSpotLight();
+
+            // RenderPipeline 중앙 제어를 통한 일괄 실행
+            mRenderPipeline.Execute(context);
+        }
+        else
+        {
+            // Scene이 없을 때 UI만 렌더링 및 프레임 종료
+            RenderContext context;
+            context.Renderer = &mRenderer;
+            UIPass uiPass;
+            uiPass.Execute(context);
         }
 
-        mRenderer.EndFrame();
         mInput.Update();
     }
 }

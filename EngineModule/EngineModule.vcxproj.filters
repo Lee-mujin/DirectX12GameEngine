@@ -213,6 +213,36 @@
     <ClInclude Include="RenderItem.h">
       <Filter>Graphics\h</Filter>
     </ClInclude>
+    <ClInclude Include="RenderQueue.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPass.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="ShadowPass.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="GeometryPass.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="UIPass.h">
+      <Filter>Graphics\h</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialInstance.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetDatabase.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationSystem.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderSystem.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPipeline.h">
+      <Filter>Resource\cpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngineModule.cpp">
@@ -361,6 +391,24 @@
     </ClCompile>
     <ClCompile Include="ShadowMap.cpp">
       <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="ShadowPass.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="GeometryPass.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="UIPass.cpp">
+      <Filter>Graphics\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetDatabase.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="AnimationSystem.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderSystem.cpp">
+      <Filter>Resource\cpp</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

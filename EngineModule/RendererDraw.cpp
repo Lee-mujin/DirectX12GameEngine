@@ -312,3 +312,31 @@ void D3D12Renderer::EndShadowPass()
     mShadowMap.End(mCommandList.Get());
     mShadowDrawIndex = 0;
 }
+
+void D3D12Renderer::Render(const RenderQueue& renderQueue)
+{
+    for (const auto& item : renderQueue.GetOpaqueItems())
+    {
+        DrawRenderItem(item);
+    }
+}
+
+void D3D12Renderer::RenderShadow(const RenderQueue& renderQueue)
+{
+    for (const auto& item : renderQueue.GetOpaqueItems())
+    {
+        if (item.IsSkinned())
+        {
+            if (item.SkinnedMeshPtr)
+            {
+                static const std::vector<Matrix4x4> kEmptyBones;
+                const auto& bones = item.BoneMatrices ? *item.BoneMatrices : kEmptyBones;
+                DrawShadowSkinnedMesh(*item.SkinnedMeshPtr, item.WorldMatrix, bones);
+            }
+        }
+        else if (item.MeshPtr)
+        {
+            DrawShadowMesh(*item.MeshPtr, item.WorldMatrix);
+        }
+    }
+}
