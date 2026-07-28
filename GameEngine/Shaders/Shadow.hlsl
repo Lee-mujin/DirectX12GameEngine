@@ -9,7 +9,7 @@ cbuffer BoneCB : register(b1)
     matrix gBoneMatrices[MAX_BONES];
 };
 
-//Input Layout 시맨틱과 동일하게 매칭되는 구조체 정의
+// Input Layout 시맨틱과 동일하게 매칭되는 구조체 정의
 struct VSInput
 {
     float3 position : POSITION;
@@ -30,13 +30,13 @@ struct SkinnedVSInput
     float4 boneWeights : BONEWEIGHTS;
 };
 
-//Static Mesh용 Shadow Vertex Shader
+// Static Mesh용 Shadow Vertex Shader (Entry point: VSMain)
 float4 VSMain(VSInput input) : SV_POSITION
 {
     return mul(float4(input.position, 1.0f), gWorldLightViewProj);
 }
 
-//Skinned Mesh용 Shadow Vertex Shader
+// Skinned Mesh용 Shadow Vertex Shader (Entry point: VSMain_Skinned)
 float4 VSMain_Skinned(SkinnedVSInput input) : SV_POSITION
 {
     matrix skinMatrix =

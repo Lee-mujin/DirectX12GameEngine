@@ -213,24 +213,34 @@ void D3D12Renderer::DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& mat
     DrawMeshInternal(mesh, material, worldMatrix, &boneData, mSkinnedPSO.Get());
 }
 
-void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera& camera)
+// ✨ cascadeIndex를 매개변수로 받아 지정된 Layer DSV로 바인딩하도록 수정
+void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera& camera, UINT cascadeIndex)
 {
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
-    SyncFrameViaRingBuffer(fr);
-    ResetCommandSession(fr);
-    mIsCommandListRecording = true;
 
-    //CSMCalculator 분리 호출
-    CascadeData csmData = CSMCalculator::Calculate(light, camera, 0.1f, 100.0f, mShadowMap.GetSize());
-    for (UINT i = 0; i < kCascadeCount; ++i)
+    if (cascadeIndex == 0)
     {
-        mCascadeLightViewProj[i] = csmData.ViewProjMatrices[i];
-    }
-    mCascadeSplits = csmData.SplitDistances;
-    mLightViewProj = mCascadeLightViewProj[0];
+        if (!mIsCommandListRecording)
+        {
+            SyncFrameViaRingBuffer(fr);
+            ResetCommandSession(fr);
+            mIsCommandListRecording = true;
+        }
 
-    // D32_FLOAT 전용 Shadow DSV 바인딩
-    mShadowMap.Begin(mCommandList.Get());
+        // CSMCalculator 분리 호출 및 3단계 ViewProj 저장
+        CascadeData csmData = CSMCalculator::Calculate(light, camera, 0.1f, 100.0f, mShadowMap.GetSize());
+        for (UINT i = 0; i < kCascadeCount; ++i)
+        {
+            mCascadeLightViewProj[i] = csmData.ViewProjMatrices[i];
+        }
+        mCascadeSplits = csmData.SplitDistances;
+    }
+
+    // 현재 패스의 LightViewProj 지정
+    mLightViewProj = mCascadeLightViewProj[cascadeIndex];
+
+    // D32_FLOAT 전용 Texture2DArray 지정 Layer DSV 바인딩
+    mShadowMap.BeginPass(mCommandList.Get(), cascadeIndex);
 
     // D32_FLOAT 전용 Shadow RootSignature & PSO 바인딩
     mCommandList->SetGraphicsRootSignature(mShadowRootSignature.Get());
@@ -244,7 +254,7 @@ void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatri
 
     const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
 
-    //Shadow Pass용 D32_FLOAT PSO
+    // Shadow Pass용 D32_FLOAT PSO
     mCommandList->SetPipelineState(mShadowPSO.Get());
 
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
@@ -309,7 +319,7 @@ void D3D12Renderer::DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4
 
 void D3D12Renderer::EndShadowPass()
 {
-    mShadowMap.End(mCommandList.Get());
+    mShadowMap.EndPass(mCommandList.Get());
     mShadowDrawIndex = 0;
 }
 

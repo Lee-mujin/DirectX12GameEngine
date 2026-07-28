@@ -19,7 +19,7 @@
 
 using Microsoft::WRL::ComPtr;
 
-//루트 슬롯 번호 enum으로 상수화
+// 루트 슬롯 번호 enum으로 상수화
 enum class RootSlot : UINT
 {
     ObjectCB = 0,
@@ -65,7 +65,7 @@ public:
     void DrawMesh(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix);
     void DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
 
-    //RenderItem 기반 드로우 함수 추가
+    // RenderItem 기반 드로우 함수 추가
     void DrawRenderItem(const RenderItem& item);
 
     void EndFrame();
@@ -85,9 +85,9 @@ public:
     void SetDefaultWhiteTexture(std::shared_ptr<Texture> texture) { mDefaultWhiteTexture = texture; }
 
     bool InitializeShadowMap(); // Initialize() 안에서 호출
-    void RenderShadowPass(const DirectionalLight& light, const std::vector<std::pair<const Mesh*, Matrix4x4>>& staticDrawList
-    /* 스키닝 드로우 목록도 필요하면 별도 오버로드 또는 구조체로 */);
-    void BeginShadowPass(const DirectionalLight& light, const Camera& camera);
+
+    //CSM Cascade Index 지원을 위해 cascadeIndex = 0 매개변수 추가
+    void BeginShadowPass(const DirectionalLight& light, const Camera& camera, UINT cascadeIndex = 0);
     void DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix);
     void DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
     void EndShadowPass();
@@ -99,7 +99,7 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetShadowMapSRV() const { return mShadowMap.GetSRV(); }
 
 private:
-    //Initialize 도메인 모듈화 함수들
+    // Initialize 도메인 모듈화 함수들
     void InitializeDevice();
     void InitializeFrameResources();
     void InitializeDescriptors();
@@ -108,13 +108,13 @@ private:
 
     void CompileShaderInternal(const std::wstring& filename, const char* entryPoint, const char* target, ID3DBlob** shaderBlob);
 
-    //DrawMeshInternal 서브루틴 분리 함수 선언
+    // DrawMeshInternal 서브루틴 분리 함수 선언
     void BindMaterial(const Material& material, bool hasNormalMap);
     void UploadObjectCB(const Material& material, const Matrix4x4& worldMatrix, bool hasNormalMap);
     void UploadBoneCB(const BoneCBData* boneData);
     void DrawGeometry(const Mesh& mesh);
 
-    //RenderItem 전용 서브루틴 선언
+    // RenderItem 전용 서브루틴 선언
     void BindItemTextures(const RenderItem& item);
     void UploadObjectCB(const RenderItem& item);
     void UploadBoneCB(const std::vector<Matrix4x4>* boneMatrices);
@@ -148,6 +148,7 @@ private:
     static constexpr UINT kFrameCount = 2;
     static constexpr UINT kMaxObjectsPerFrame = 64;
     static constexpr UINT kMaxSrvCount = 32;
+    static constexpr UINT kCascadeCount = 3; //Cascade 개수 상수 정의
 
     HWND mHwnd = nullptr;
     UINT mWidth = 0;
@@ -206,7 +207,7 @@ private:
     ComPtr<ID3DBlob> mShadowVertexShader;
     ComPtr<ID3DBlob> mShadowSkinnedVertexShader;
     UINT mShadowDrawIndex = 0;
-    Matrix4x4 mLightViewProj; //Main Pass 셰이더에 넘길 때 씀
+    Matrix4x4 mLightViewProj; // Main Pass 셰이더에 넘길 때 씀
 
     bool mIsCommandListRecording = false;
 

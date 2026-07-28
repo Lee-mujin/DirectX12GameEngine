@@ -30,7 +30,7 @@ cbuffer LightCB : register(b2)
     float gLightPad0;
     
     // Light Space 변환 행렬 (Directional Light 전용)
-    //C++ LightCBData 규격(WorldLightViewProj[3])에 맞춰 3개 캐스케이드 행렬 및 분할 거리 추가
+    // C++ LightCBData 규격(WorldLightViewProj[3])에 맞춰 3개 캐스케이드 행렬 및 분할 거리 추가
     matrix gWorldLightViewProj[3];
     float4 gCascadeSplits; // x: Near, y: Mid, z: Far
 
@@ -53,13 +53,14 @@ cbuffer LightCB : register(b2)
     float gSpotLightOuterCos;
     int gSpotLightEnabled;
     
-    //Spot Light 전용 View-Projection 변환 행렬 (LightCBData의 SpotLightViewProj와 1:1 매칭)
+    // Spot Light 전용 View-Projection 변환 행렬 (LightCBData의 SpotLightViewProj와 1:1 매칭)
     matrix gSpotLightViewProj;
 };
 
 Texture2D gTexture : register(t0);
 Texture2D gNormalTexture : register(t1);
-Texture2D gShadowMap : register(t2);
+//CSM 3-Layer 지원을 위해 Texture2DArray로 변경
+Texture2DArray gShadowMap : register(t2);
 
 SamplerState gSampler : register(s0);
 SamplerComparisonState gShadowSampler : register(s1);
@@ -94,7 +95,7 @@ struct PSInput
     float4 color : COLOR;
     float2 uv : TEXCOORD0;
     float4 shadowPosH : TEXCOORD2;
-    float4 spotShadowPosH : TEXCOORD3; //Spot Light용 Light Space 클립 좌표
+    float4 spotShadowPosH : TEXCOORD3; // Spot Light용 Light Space 클립 좌표
 };
 
 PSInput VSMain_Skinned(SkinnedVSInput input)
@@ -115,9 +116,9 @@ PSInput VSMain_Skinned(SkinnedVSInput input)
     output.worldPos = worldPos.xyz;
     output.position = mul(mul(worldPos, gView), gProj);
 
-    //0번 캐스케이드(근거리) 기준 초기 변환 값
+    // 0번 캐스케이드(근거리) 기준 초기 변환 값
     output.shadowPosH = mul(worldPos, gWorldLightViewProj[0]);
-    output.spotShadowPosH = mul(worldPos, gSpotLightViewProj); //Spot Light 좌표 변환
+    output.spotShadowPosH = mul(worldPos, gSpotLightViewProj); // Spot Light 좌표 변환
 
     float3 N = normalize(mul(skinnedNormal, (float3x3) gWorld));
     float3 T = normalize(mul(skinnedTangent, (float3x3) gWorld));
@@ -141,9 +142,9 @@ PSInput VSMain(VSInput input)
     output.worldPos = worldPos.xyz;
     output.position = mul(mul(worldPos, gView), gProj);
 
-    //0번 캐스케이드(근거리) 기준 초기 변환 값
+    // 0번 캐스케이드(근거리) 기준 초기 변환 값
     output.shadowPosH = mul(worldPos, gWorldLightViewProj[0]);
-    output.spotShadowPosH = mul(worldPos, gSpotLightViewProj); //Spot Light 좌표 변환
+    output.spotShadowPosH = mul(worldPos, gSpotLightViewProj); // Spot Light 좌표 변환
 
     float3 N = normalize(mul(input.normal, (float3x3) gWorld));
     float3 T = normalize(mul(input.tangent.xyz, (float3x3) gWorld));
@@ -159,10 +160,15 @@ PSInput VSMain(VSInput input)
     return output;
 }
 
-//Bias & 4순위 Resolution 대응] Shadow Factor 계산 함수
-//lightDir 파라미터 ,조명 타입별(Directional/Spot) 광원 방향을 받아 동적 Bias 계산
+// Bias & Resolution 대응 Shadow Factor 계산 함수 (SpotLight 등 single-slice용 겸용)
 float CalculateShadowFactor(float4 shadowPosH, float3 normalWS, float3 lightDir)
 {
+    // 광원 뒤쪽에 있는 메시나 clipped 좌표의 divide-by-zero 및 좌표 뒤집힘 방지
+    if (shadowPosH.w <= 0.0f)
+    {
+        return 1.0f;
+    }
+
     // 원근 제형(Perspective Divide) 및 NDC 변환
     shadowPosH.xyz /= shadowPosH.w;
 
@@ -178,16 +184,16 @@ float CalculateShadowFactor(float4 shadowPosH, float3 normalWS, float3 lightDir)
         return 1.0f;
     }
 
-    //Slope-based Dynamic Depth Bias 계산
+    // Slope-based Dynamic Depth Bias 계산
     float NdotL = saturate(dot(normalWS, lightDir));
     float bias = max(0.0005f, 0.005f * (1.0f - NdotL));
 
-    //섀도우 맵 해상도 자동 추출
-    float width, height;
-    gShadowMap.GetDimensions(width, height);
+    // 섀도우 맵 해상도 자동 추출 (Texture2DArray 규격)
+    float width, height, elements;
+    gShadowMap.GetDimensions(width, height, elements);
     float2 texelSize = float2(1.0f / width, 1.0f / height);
 
-    //5x5 PCF 샘플링 (25번 비교로 외곽선 부드럽게 무화)
+    // 5x5 PCF 샘플링 (25번 비교로 외곽선 부드럽게 무화, 0번 슬라이스 기준)
     float percentLit = 0.0f;
     [unroll]
     for (int x = -2; x <= 2; ++x)
@@ -197,15 +203,15 @@ float CalculateShadowFactor(float4 shadowPosH, float3 normalWS, float3 lightDir)
         {
             percentLit += gShadowMap.SampleCmpLevelZero(
                 gShadowSampler,
-                shadowUV + float2(x, y) * texelSize,
+                float3(shadowUV + float2(x, y) * texelSize, 0.0f),
                 depth - bias
             );
         }
     }
-    return percentLit / 25.0f; //5x5 샘플링 개수(25개)에 맞춘 평균값 계산
+    return percentLit / 25.0f; // 5x5 샘플링 개수(25개)에 맞춘 평균값 계산
 }
 
-//View Depth 기반 Cascade 인덱스 자동 선택 및 통합 Shadow Factor 연산
+// View Depth 기반 Cascade 인덱스 자동 선택 및 Texture2DArray 샘플링
 float CalculateCSMShadowFactor(float3 worldPos, float3 normalWS, float3 lightDir)
 {
     // 1. 카메라 View Space의 Depth(Z) 계산
@@ -226,7 +232,47 @@ float CalculateCSMShadowFactor(float3 worldPos, float3 normalWS, float3 lightDir
     // 3. 선택된 Cascade의 Light ViewProj 행렬로 좌표 변환
     float4 shadowPosH = mul(float4(worldPos, 1.0f), gWorldLightViewProj[cascadeIndex]);
 
-    return CalculateShadowFactor(shadowPosH, normalWS, lightDir);
+    if (shadowPosH.w <= 0.0f)
+    {
+        return 1.0f;
+    }
+
+    shadowPosH.xyz /= shadowPosH.w;
+
+    float2 shadowUV = shadowPosH.xy * 0.5f + 0.5f;
+    shadowUV.y = 1.0f - shadowUV.y;
+
+    float depth = shadowPosH.z;
+
+    if (shadowUV.x < 0.0f || shadowUV.x > 1.0f || shadowUV.y < 0.0f || shadowUV.y > 1.0f || depth > 1.0f)
+    {
+        return 1.0f;
+    }
+
+    float NdotL = saturate(dot(normalWS, lightDir));
+    float bias = max(0.0005f, 0.005f * (1.0f - NdotL));
+
+    float width, height, elements;
+    gShadowMap.GetDimensions(width, height, elements);
+    float2 texelSize = float2(1.0f / width, 1.0f / height);
+
+    //Texture2DArray용 float3(UV, cascadeIndex) 전달
+    float percentLit = 0.0f;
+    [unroll]
+    for (int x = -2; x <= 2; ++x)
+    {
+        [unroll]
+        for (int y = -2; y <= 2; ++y)
+        {
+            float3 sampleUV = float3(shadowUV + float2(x, y) * texelSize, (float) cascadeIndex);
+            percentLit += gShadowMap.SampleCmpLevelZero(
+                gShadowSampler,
+                sampleUV,
+                depth - bias
+            );
+        }
+    }
+    return percentLit / 25.0f;
 }
 
 float3 CalcDirLight(float3 worldPos, float3 normal, float3 viewDir)
@@ -239,10 +285,10 @@ float3 CalcDirLight(float3 worldPos, float3 normal, float3 viewDir)
     float NdotH = saturate(dot(normal, halfDir));
     float3 specular = gDirLightColor * pow(NdotH, gShininess) * NdotL;
 
-    //Bias가 적용된 Shadow Factor 계산 (Directional Light - CSM 적용)
+    // Bias가 적용된 Shadow Factor 계산 (Directional Light - CSM 적용)
     float shadowFactor = CalculateCSMShadowFactor(worldPos, normal, lightDir);
 
-    //Ambient 처리: 직사광(Diffuse + Specular)에만 shadowFactor 곱하기
+    // Ambient 처리: 직사광(Diffuse + Specular)에만 shadowFactor 곱하기
     return (diffuse + specular * 0.3f) * shadowFactor;
 }
 
@@ -270,7 +316,7 @@ float3 CalcPointLight(float3 worldPos, float3 normal, float3 viewDir)
     return (diffuse + specular * 0.3f) * attenuation;
 }
 
-//Spot Light용 spotShadowPosH 매개변수 추가 및 섀도우 맵 적용
+// Spot Light용 spotShadowPosH 매개변수 추가 및 섀도우 맵 적용
 float3 CalcSpotLight(float3 worldPos, float3 normal, float3 viewDir, float4 spotShadowPosH)
 {
     if (gSpotLightEnabled == 0)
@@ -302,7 +348,7 @@ float3 CalcSpotLight(float3 worldPos, float3 normal, float3 viewDir, float4 spot
     float NdotH = saturate(dot(normal, halfDir));
     float3 specular = gSpotLightColor * pow(NdotH, gShininess) * NdotL;
 
-    //Spot Light에도 섀도우 연산 적용
+    // Spot Light에도 섀도우 연산 적용
     float shadowFactor = CalculateShadowFactor(spotShadowPosH, normal, lightDir);
 
     return (diffuse + specular * 0.3f) * attenuation * spotFactor * shadowFactor;
@@ -329,13 +375,13 @@ float4 PSMain(PSInput input) : SV_TARGET
 
     float3 viewDir = normalize(gCameraPos - input.worldPos);
 
-    //기본 환경광(Ambient) 0.15 추가하여 완전 검은색 방지
+    // 기본 환경광(Ambient) 0.15 추가하여 완전 검은색 방지
     float3 ambient = float3(0.15f, 0.15f, 0.15f);
 
-    //CalcDirLight에 input.worldPos를 전달하여 CSM 연산 수행
+    // CalcDirLight에 input.worldPos를 전달하여 CSM 연산 수행
     float3 directLighting = CalcDirLight(input.worldPos, N, viewDir)
         + CalcPointLight(input.worldPos, N, viewDir)
-        + CalcSpotLight(input.worldPos, N, viewDir, input.spotShadowPosH); //Spot Light 좌표 전달
+        + CalcSpotLight(input.worldPos, N, viewDir, input.spotShadowPosH); // Spot Light 좌표 전달
 
     float3 finalColor = baseColor.rgb * (ambient + directLighting);
 

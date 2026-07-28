@@ -29,11 +29,13 @@ void FrameResource::Create(ID3D12Device* device, UINT maxObjectCount)
 
     objectCBStride = Align256(sizeof(ObjectCBData));
     CreateUploadBuffer(device, objectCBStride * maxObjectCount, objectCB, &objectCBMapped);
+
+    //단일 CBuffer 객체(Camera, Light)들도 256바이트 정렬 할당 보장
     CreateUploadBuffer(device, Align256(sizeof(CameraCBData)), cameraCB, &cameraCBMapped);
     CreateUploadBuffer(device, Align256(sizeof(LightCBData)), lightCB, &lightCBMapped);
 
     boneCBStride = Align256(sizeof(BoneCBData));
-    CreateUploadBuffer(device, boneCBStride * maxObjectCount, boneCB, &boneCBMapped); //boneCB추가
+    CreateUploadBuffer(device, boneCBStride * maxObjectCount, boneCB, &boneCBMapped);
 
     shadowCBStride = Align256(sizeof(ShadowCBData));
     CreateUploadBuffer(device, shadowCBStride * maxObjectCount, shadowCB, &shadowCBMapped);

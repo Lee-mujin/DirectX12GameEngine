@@ -241,7 +241,19 @@
       <Filter>Resource\h</Filter>
     </ClInclude>
     <ClInclude Include="RenderPipeline.h">
-      <Filter>Resource\cpp</Filter>
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="RayCastHit.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="Ray.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="BoundingBox.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="BoundingSphere.h">
+      <Filter>Resource\h</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -408,6 +420,12 @@
       <Filter>Resource\cpp</Filter>
     </ClCompile>
     <ClCompile Include="RenderSystem.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="BoundingBox.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="BoundingSphere.cpp">
       <Filter>Resource\cpp</Filter>
     </ClCompile>
   </ItemGroup>
