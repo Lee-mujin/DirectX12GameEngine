@@ -14,7 +14,7 @@ struct FileEntry
 class ContentBrowser
 {
 public:
-    // path, extension(".glb" 등)을 넘겨줌 — 실제 로드는 이 콜백을 등록한 쪽(Application)이 판단
+    //path, extension(".glb" 등)을 넘겨줌 — 실제 로드는 이 콜백을 등록한 쪽(Application)이 판단
     using ActivateCallback = std::function<void(const std::filesystem::path&)>;
 
     void Initialize(const std::string& rootPath, ActivateCallback onActivate);

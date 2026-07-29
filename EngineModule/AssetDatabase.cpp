@@ -19,7 +19,7 @@ void AssetDatabase::Initialize(const std::string& rootPath)
 
 AssetHandle AssetDatabase::RegisterOrGetHandle(const std::string& path)
 {
-    // 경로 정규화 (역슬래시 -> 슬래시)
+    //경로 정규화 (역슬래시 -> 슬래시)
     std::string normalizedPath = path;
     std::replace(normalizedPath.begin(), normalizedPath.end(), '\\', '/');
 

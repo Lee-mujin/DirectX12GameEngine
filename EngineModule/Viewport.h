@@ -2,9 +2,20 @@
 #include <d3d12.h>
 
 class EditorState;
+class Camera;
+class Scene;
+class Input;
 
 class Viewport
 {
 public:
-    void Draw(EditorState& editorState, D3D12_GPU_DESCRIPTOR_HANDLE textureHandle, float& outWidth, float& outHeight, float& outPosX, float& outPosY);
+    void Draw(
+        EditorState& editorState,
+        D3D12_GPU_DESCRIPTOR_HANDLE textureHandle,
+        float& outWidth, float& outHeight,
+        float& outPosX, float& outPosY,
+        Camera* camera = nullptr,
+        Scene* scene = nullptr,
+        Input* input = nullptr
+    );
 };

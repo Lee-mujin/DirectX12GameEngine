@@ -28,7 +28,6 @@
 #include "AnimatorComponent.h"
 #include "GameObject.h"
 
-
 using Microsoft::WRL::ComPtr;
 
 inline void ThrowIfFailed(HRESULT hr)

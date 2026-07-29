@@ -11,7 +11,7 @@ void Hierarchy::Draw(Scene& scene, EditorState& editorState)
 
     auto selected = editorState.GetSelected();
 
-    // 1. 오브젝트 리스트 출력 루프
+    //오브젝트 리스트 출력 루프
     for (auto& obj : scene.GetGameObjects())
     {
         ImGui::PushID(obj.get());
@@ -22,7 +22,7 @@ void Hierarchy::Draw(Scene& scene, EditorState& editorState)
             editorState.SetSelected(obj);
         }
 
-        // 개별 오브젝트 위에 직접 드롭했을 때 (예: 계층 변경이나 특정 타겟 지정 시 사용 가능)
+        //개별 오브젝트 위에 직접 드롭했을 때 (예: 계층 변경이나 특정 타겟 지정 시 사용 가능)
         if (ImGui::BeginDragDropTarget())
         {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ASSET"))

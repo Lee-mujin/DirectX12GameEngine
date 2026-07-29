@@ -16,7 +16,7 @@ bool D3D12Renderer::Initialize(HWND hwnd, UINT width, UINT height)
     return true;
 }
 
-// 1. 하드웨어 디바이스, 큐, 펜스 생성
+//하드웨어 디바이스, 큐, 펜스 생성
 void D3D12Renderer::InitializeDevice()
 {
     CreateFactory();
@@ -25,37 +25,37 @@ void D3D12Renderer::InitializeDevice()
     CreateFence();
 }
 
-// 2. 프레임 리소스 버퍼 및 커맨드 리스트 초기화
+//프레임 리소스 버퍼 및 커맨드 리스트 초기화
 void D3D12Renderer::InitializeFrameResources()
 {
     CreateFrameResources();
     CreateCommandList();
 }
 
-// 3. 디스크립터 할당자 Heap 초기화
+//디스크립터 할당자 Heap 초기화
 void D3D12Renderer::InitializeDescriptors()
 {
-    // Allocator 안전 초기화 (DSV Heap 개수를 8개로 늘려 슬롯 겹침 방지)
+    //Allocator 안전 초기화 (DSV Heap 개수를 8개로 늘려 슬롯 겹침 방지)
     mSrvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSrvCount, true);
     mRtvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kFrameCount + 1, false);
     mDsvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 8, false); //8개로 확장
 }
 
-// 4. 스왑체인, 백버퍼 RTV, 메인/섀도우 DSV 및 뷰포트 생성
+//스왑체인, 백버퍼 RTV, 메인/섀도우 DSV 및 뷰포트 생성
 void D3D12Renderer::InitializeRenderTargets()
 {
     CreateSwapChain();
     CreateRenderTargetViews();
     CreateDepthStencil(); // 0번 슬롯: 메인 Depth Stencil View (D24_UNORM_S8_UINT)
 
-    // Depth Stencil 생성 완료 후 1번 슬롯에 ShadowMap (D32_FLOAT) 생성
+    //Depth Stencil 생성 완료 후 1번 슬롯에 ShadowMap (D32_FLOAT) 생성
     InitializeShadowMap();
 
     SetupViewport();
     InitializeViewport(1280, 720);
 }
 
-// 5. 파이프라인(셰이더, 루트시그니처, PSO) 구축
+//파이프라인(셰이더, 루트시그니처, PSO) 구축
 void D3D12Renderer::InitializePipeline()
 {
     CreateShader();
@@ -65,7 +65,7 @@ void D3D12Renderer::InitializePipeline()
 
 bool D3D12Renderer::InitializeShadowMap()
 {
-    // ShadowMap 초기화 (Descriptor Heap 슬롯 안전 할당)
+    //ShadowMap 초기화 (Descriptor Heap 슬롯 안전 할당)
     return mShadowMap.Initialize(mDevice.Get(), &mDsvAllocator, &mSrvAllocator, 2048);
 }
 
@@ -169,7 +169,7 @@ void D3D12Renderer::CreateDepthStencil()
     dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
-    // DSV 할당자의 Start 위치에 메인 DepthStencilView 생성
+    //DSV 할당자의 Start 위치에 메인 DepthStencilView 생성
     DescriptorHandle mainDsvHandle = mDsvAllocator.Allocate();
     mDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, mainDsvHandle.CpuHandle);
 }

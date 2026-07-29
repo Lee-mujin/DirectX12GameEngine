@@ -45,7 +45,7 @@ void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std:
     memcpy(mappedIndex, indices.data(), indexBufferSize);
     mIndexUploadBuffer->Unmap(0, nullptr);
 
-    // Copy Queue에서는 복사만 수행
+    //Copy Queue에서는 복사만 수행
     uploadContext->Execute([this, vertexBufferSize, indexBufferSize](ID3D12GraphicsCommandList* cmdList) {
         cmdList->CopyBufferRegion(mVertexBuffer.Get(), 0, mVertexUploadBuffer.Get(), 0, vertexBufferSize);
         cmdList->CopyBufferRegion(mIndexBuffer.Get(), 0, mIndexUploadBuffer.Get(), 0, indexBufferSize);
@@ -58,6 +58,13 @@ void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std:
     mIndexBufferView.BufferLocation = mIndexBuffer->GetGPUVirtualAddress();
     mIndexBufferView.Format = DXGI_FORMAT_R16_UINT;
     mIndexBufferView.SizeInBytes = indexBufferSize;
+
+    //정점(Vertex) 데이터 순회로 Local BoundingBox 생성
+    mBoundingBox = BoundingBox();
+    for (const auto& vertex : vertices)
+    {
+        mBoundingBox.Encapsulate(Vector3(vertex.position[0], vertex.position[1], vertex.position[2]));
+    }
 }
 
 void Mesh::TransitionToRenderState(ID3D12GraphicsCommandList* cmdList)

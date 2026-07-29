@@ -74,10 +74,10 @@ void AnimatorComponent::CrossFade(const std::string& clipName, float fadeDuratio
     int targetIndex = FindClipIndex(clipName);
     if (targetIndex < 0 || targetIndex == mCurrentAnimIndex)
     {
-        return; // 없는 클립이거나 이미 재생 중인 클립이면 무시
+        return; //없는 클립이거나 이미 재생 중인 클립이면 무시
     }
 
-    // 지금 재생 중이던 클립을 "이전 클립"으로 넘기고, 그 지점부터 페이드 시작
+    //지금 재생 중이던 클립을 이전 클립으로 넘기고, 그 지점부터 페이드 시작
     mPrevAnimIndex = mCurrentAnimIndex;
     mPrevTime = mCurrentTime;
 

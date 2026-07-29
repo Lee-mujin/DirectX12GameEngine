@@ -1,8 +1,8 @@
 #pragma once
 #include <cstdint>
 
-// 경로를 직접 들고 다니지 않는 불투명 핸들.
-// 실제 경로 조회/캐시는 항상 ResourceManager/AssetDatabase를 통해서만 이루어진다.
+//경로를 직접 들고 다니지 않는 불투명 핸들
+//실제 경로 조회/캐시는 항상 ResourceManager/AssetDatabase를 통해서만
 class AssetHandle
 {
 public:

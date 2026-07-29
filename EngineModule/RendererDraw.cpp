@@ -12,10 +12,10 @@ using namespace DirectX;
 
 extern XMMATRIX D3D12RendererToXM(const Matrix4x4& m);
 
-// 1. 머티리얼 텍스처 및 섀도우 맵 루트 디스크립터 바인딩
+//머티리얼 텍스처 및 섀도우 맵 루트 디스크립터 바인딩
 void D3D12Renderer::BindMaterial(const Material& material, bool hasNormalMap)
 {
-    // Base Color Texture 바인딩
+    //Base Color Texture 바인딩
     std::shared_ptr<Texture> baseTexture = material.GetTexture();
     if (!baseTexture) baseTexture = mDefaultWhiteTexture;
 
@@ -25,7 +25,7 @@ void D3D12Renderer::BindMaterial(const Material& material, bool hasNormalMap)
         mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::BaseTexture), baseTexture->GetSrvHandle());
     }
 
-    // Normal Map Texture 바인딩
+    //Normal Map Texture 바인딩
     std::shared_ptr<Texture> normalTexture = material.GetNormalTexture();
     if (hasNormalMap && normalTexture)
     {
@@ -37,11 +37,11 @@ void D3D12Renderer::BindMaterial(const Material& material, bool hasNormalMap)
         mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::NormalTexture), mDefaultWhiteTexture->GetSrvHandle());
     }
 
-    // 6번 Root Slot에 Shadow Map SRV 바인딩
+    //6번 Root Slot에 Shadow Map SRV 바인딩
     mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::ShadowTexture), mShadowMap.GetSRV());
 }
 
-// 2. 오브젝트 상수 버퍼(ObjectCB) 메모리 복사 및 Root CBV 바인딩
+//오브젝트 상수 버퍼(ObjectCB) 메모리 복사 및 Root CBV 바인딩
 void D3D12Renderer::UploadObjectCB(const Material& material, const Matrix4x4& worldMatrix, bool hasNormalMap)
 {
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
@@ -61,7 +61,7 @@ void D3D12Renderer::UploadObjectCB(const Material& material, const Matrix4x4& wo
     mCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(RootSlot::ObjectCB), objectCBAddress);
 }
 
-// 3. 스킨드 애니메이션용 보간 행렬(BoneCB) 데이터 업로드
+//스킨드 애니메이션용 보간 행렬(BoneCB) 데이터 업로드
 void D3D12Renderer::UploadBoneCB(const BoneCBData* boneData)
 {
     if (!boneData) return;
@@ -75,7 +75,7 @@ void D3D12Renderer::UploadBoneCB(const BoneCBData* boneData)
     mCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(RootSlot::BoneCB), boneCBAddress);
 }
 
-// 4. 메시 상태 전이 및 인덱스 기반 DrawCall 수행
+//메시 상태 전이 및 인덱스 기반 DrawCall 수행
 void D3D12Renderer::DrawGeometry(const Mesh& mesh)
 {
     const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
@@ -213,7 +213,7 @@ void D3D12Renderer::DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& mat
     DrawMeshInternal(mesh, material, worldMatrix, &boneData, mSkinnedPSO.Get());
 }
 
-// ✨ cascadeIndex를 매개변수로 받아 지정된 Layer DSV로 바인딩하도록 수정
+//cascadeIndex를 매개변수로 받아 지정된 Layer DSV로 바인딩
 void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera& camera, UINT cascadeIndex)
 {
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
@@ -227,7 +227,7 @@ void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera&
             mIsCommandListRecording = true;
         }
 
-        // CSMCalculator 분리 호출 및 3단계 ViewProj 저장
+        //CSMCalculator 분리 호출 및 3단계 ViewProj 저장
         CascadeData csmData = CSMCalculator::Calculate(light, camera, 0.1f, 100.0f, mShadowMap.GetSize());
         for (UINT i = 0; i < kCascadeCount; ++i)
         {
@@ -236,13 +236,13 @@ void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera&
         mCascadeSplits = csmData.SplitDistances;
     }
 
-    // 현재 패스의 LightViewProj 지정
+    //현재 패스의 LightViewProj 지정
     mLightViewProj = mCascadeLightViewProj[cascadeIndex];
 
-    // D32_FLOAT 전용 Texture2DArray 지정 Layer DSV 바인딩
+    //D32_FLOAT 전용 Texture2DArray 지정 Layer DSV 바인딩
     mShadowMap.BeginPass(mCommandList.Get(), cascadeIndex);
 
-    // D32_FLOAT 전용 Shadow RootSignature & PSO 바인딩
+    //D32_FLOAT 전용 Shadow RootSignature & PSO 바인딩
     mCommandList->SetGraphicsRootSignature(mShadowRootSignature.Get());
     mCommandList->SetPipelineState(mShadowPSO.Get());
     mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -254,7 +254,7 @@ void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatri
 
     const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
 
-    // Shadow Pass용 D32_FLOAT PSO
+    //Shadow Pass용 D32_FLOAT PSO
     mCommandList->SetPipelineState(mShadowPSO.Get());
 
     FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];

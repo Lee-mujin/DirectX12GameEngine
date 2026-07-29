@@ -188,6 +188,7 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="ModelUtility.h" />
+    <ClInclude Include="PickingSystem.h" />
     <ClInclude Include="PointLight.h" />
     <ClInclude Include="Ray.h" />
     <ClInclude Include="RayCastHit.h" />
@@ -274,6 +275,7 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="ModelUtility.cpp" />
+    <ClCompile Include="PickingSystem.cpp" />
     <ClCompile Include="RendererDraw.cpp" />
     <ClCompile Include="RendererFrame.cpp" />
     <ClCompile Include="RendererViewport.cpp" />

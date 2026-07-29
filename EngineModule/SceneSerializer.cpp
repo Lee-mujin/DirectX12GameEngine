@@ -78,7 +78,7 @@ bool SceneSerializer::Load(Scene& scene, Application& app, ResourceManager& reso
         else if (token == "Scale") { ss >> scale.X >> scale.Y >> scale.Z; }
         else if (token == "EndGameObject")
         {
-            AssetHandle handle = resourceManager.GetOrCreateHandle(assetPath); // 경로 -> 핸들 변환은 여기 한 곳
+            AssetHandle handle = resourceManager.GetOrCreateHandle(assetPath); //경로 -> 핸들 변환은 여기 한 곳
             auto obj = app.SpawnAssetIntoScene(handle);
             if (obj)
             {

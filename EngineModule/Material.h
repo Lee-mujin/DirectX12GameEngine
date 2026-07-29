@@ -11,7 +11,7 @@ public:
     Material() = default;
     ~Material() = default;
 
-    // Base Color Texture
+    //Base Color Texture
     void SetBaseColorTexture(std::shared_ptr<Texture> texture, AssetHandle handle = AssetHandle())
     {
         mBaseColorTexture = texture;
@@ -39,7 +39,7 @@ public:
     std::shared_ptr<Texture> GetNormalTexture() const { return mNormalTexture; }
     AssetHandle GetNormalHandle() const { return mNormalHandle; }
 
-    // PBR & Material Properties
+    //PBR & Material Properties
     const Vector3& GetBaseColor() const { return mBaseColor; }
     void SetBaseColor(const Vector3& color) { mBaseColor = color; }
 

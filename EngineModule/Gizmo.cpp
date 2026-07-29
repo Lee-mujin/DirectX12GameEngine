@@ -11,13 +11,13 @@
 
 void Gizmo::Draw(EditorState& editorState, const Camera& camera, float viewportX, float viewportY, float viewportWidth, float viewportHeight)
 {
-    // ① Viewport가 포커스된 상태이고 텍스트 입력 중이 아닐 때만 단축키 처리
+    //Viewport가 포커스된 상태이고 텍스트 입력 중이 아닐 때만 단축키 처리
     if (editorState.IsViewportFocused() && !ImGui::GetIO().WantTextInput)
     {
         if (ImGui::IsKeyPressed(ImGuiKey_W)) mOperation = 0;
         if (ImGui::IsKeyPressed(ImGuiKey_E)) mOperation = 1;
         if (ImGui::IsKeyPressed(ImGuiKey_R)) mOperation = 2;
-        if (ImGui::IsKeyPressed(ImGuiKey_X)) mIsLocal = !mIsLocal; // X 키로 Local/World 토글
+        if (ImGui::IsKeyPressed(ImGuiKey_X)) mIsLocal = !mIsLocal; //X 키로 Local/World 토글
     }
 
     auto selected = editorState.GetSelected();
@@ -30,7 +30,7 @@ void Gizmo::Draw(EditorState& editorState, const Camera& camera, float viewportX
     ImGuizmo::SetDrawlist();
     ImGuizmo::SetRect(viewportX, viewportY, viewportWidth, viewportHeight);
 
-    // 모드 선택 오버레이 UI (뷰포트 좌상단 배치)
+    //모드 선택 오버레이 UI (뷰포트 좌상단 배치)
     ImGui::SetNextWindowPos(ImVec2(viewportX + 8, viewportY + 8), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.5f);
     ImGui::Begin("GizmoControls", nullptr,
@@ -47,7 +47,7 @@ void Gizmo::Draw(EditorState& editorState, const Camera& camera, float viewportX
     ImGui::TextDisabled("|");
     ImGui::SameLine();
 
-    // ② Local / World 토글 라디오 버튼
+    //Local / World 토글 라디오 버튼
     if (ImGui::RadioButton("World", !mIsLocal)) mIsLocal = false;
     ImGui::SameLine();
     if (ImGui::RadioButton("Local", mIsLocal)) mIsLocal = true;
@@ -60,7 +60,7 @@ void Gizmo::Draw(EditorState& editorState, const Camera& camera, float viewportX
 
     ImGuizmo::MODE mode = mIsLocal ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
 
-    // Scale 모드일 때는 강제로 LOCAL 처리 (World Scale 기즈모 왜곡 방지)
+    //Scale 모드일 때는 강제로 LOCAL 처리 (World Scale 기즈모 왜곡 방지)
     if (op == ImGuizmo::SCALE)
     {
         mode = ImGuizmo::LOCAL;
@@ -72,12 +72,12 @@ void Gizmo::Draw(EditorState& editorState, const Camera& camera, float viewportX
     Matrix4x4 view = camera.GetView();
     Matrix4x4 proj = camera.GetProjection();
 
-    // row-major -> ImGuizmo 전용 column-major 전치
+    //row-major -> ImGuizmo 전용 column-major 전치
     Matrix4x4 worldT = world.GetTranspose();
     Matrix4x4 viewT = view.GetTranspose();
     Matrix4x4 projT = proj.GetTranspose();
 
-    // ③ Ctrl 키 스냅 처리 (Translate: 1m, Rotate: 15도, Scale: 0.5)
+    //Ctrl 키 스냅 처리 (Translate: 1m, Rotate: 15도, Scale: 0.5)
     bool useSnap = ImGui::GetIO().KeyCtrl;
     float snapValue = (op == ImGuizmo::TRANSLATE) ? 1.0f
         : (op == ImGuizmo::ROTATE) ? 15.0f
@@ -92,10 +92,10 @@ void Gizmo::Draw(EditorState& editorState, const Camera& camera, float viewportX
         nullptr,
         useSnap ? snapValues : nullptr))
     {
-        // 전치된 결과를 다시 원본 행렬 공간으로 전치
+        //전치된 결과를 다시 원본 행렬 공간으로 전치
         Matrix4x4 newWorld = worldT.GetTranspose();
 
-        // ⑦ Matrix -> Quaternion/Vector3 기반 정밀 분해 (Euler 오차 해소)
+        //Matrix -> Quaternion/Vector3 기반 정밀 분해 (Euler 오차 해소)
         Vector3 position;
         Quaternion rotation;
         Vector3 scale;

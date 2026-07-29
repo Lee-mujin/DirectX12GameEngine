@@ -19,15 +19,15 @@ public:
 
     void Initialize(D3D12Renderer* renderer, TextureLoader* textureLoader, UploadContext* uploadContext);
 
-    // AssetDatabase 래퍼 메소드
+    //AssetDatabase 래퍼 메소드
     AssetDatabase& GetAssetDatabase() { return mAssetDB; }
     AssetHandle GetOrCreateHandle(const std::string& path) { return mAssetDB.RegisterOrGetHandle(path); }
     const std::string& GetPath(AssetHandle handle) const { return mAssetDB.GetPath(handle); }
     AssetType GetAssetType(AssetHandle handle) const { return mAssetDB.GetAssetType(handle); }
     void RemapAsset(AssetHandle handle, const std::string& newPath);
 
-    // GPU 리소스 생성 및 캐싱 로더
-    std::shared_ptr<Mesh> GetCubeMesh(); // const 제거로 cpp와 호환
+    //GPU 리소스 생성 및 캐싱 로더
+    std::shared_ptr<Mesh> GetCubeMesh(); //const 제거로 cpp와 호환
     std::shared_ptr<Texture> LoadTexture(const std::wstring& path);
     std::shared_ptr<Texture> GetDefaultWhiteTexture();
     std::shared_ptr<Texture> GetOrLoadTexture(AssetHandle handle);

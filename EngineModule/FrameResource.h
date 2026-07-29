@@ -58,7 +58,7 @@ struct LightCBData
     float SpotLightOuterCos;
     int SpotLightEnabled;
 
-    // Spot Light ViewProj 행렬
+    //Spot Light ViewProj 행렬
     DirectX::XMFLOAT4X4 SpotLightViewProj;
 };
 

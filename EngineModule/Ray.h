@@ -10,7 +10,7 @@ struct Ray
     Ray(const Vector3& origin, const Vector3& direction)
         : Origin(origin), Direction(direction.GetNormalize()) {}
 
-    // Ray 상의 특정 거리 t 지점 좌표 반환 (P = Origin + Direction * t)
+    //Ray 상의 특정 거리 t 지점 좌표 반환 (P = Origin + Direction * t)
     Vector3 GetPoint(float distance) const
     {
         return Origin + (Direction * distance);

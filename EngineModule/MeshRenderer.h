@@ -13,6 +13,10 @@ class MeshRenderer : public Component
 public:
     void SetMesh(std::shared_ptr<Mesh> mesh);
 
+    //Mesh 및 SkinnedMesh Getter 추가
+    std::shared_ptr<Mesh> GetMesh() const { return mMesh; }
+    std::shared_ptr<SkinnedMesh> GetSkinnedMesh() const { return mSkinnedMesh; }
+
     //Material 설정 시 내부적으로 MaterialInstance 자동 바인딩
     void SetMaterial(std::shared_ptr<Material> material);
     void SetMaterialInstance(const MaterialInstance& matInst) { mMaterialInstance = matInst; }

@@ -7,12 +7,14 @@
 #include "Transform.h"
 #include "Component.h"
 #include "AssetHandle.h"
+#include "BoundingBox.h"
 
 class D3D12Renderer;
 
-class GameObject
+class GameObject : public std::enable_shared_from_this<GameObject>
 {
 public:
+    GameObject() = default;
     virtual ~GameObject() = default;
 
     virtual void Update(float deltaTime);
@@ -72,6 +74,8 @@ public:
     AssetHandle GetSourceAssetHandle() const { return mSourceAssetHandle; }
     void SetSourceAssetHandle(AssetHandle handle) { mSourceAssetHandle = handle; }
     void SetName(const std::string& name) { mName = name; }
+    BoundingBox GetWorldBoundingBox() const;
+
 protected:
     Transform mTransform;
     std::vector<std::unique_ptr<Component>> mComponents;

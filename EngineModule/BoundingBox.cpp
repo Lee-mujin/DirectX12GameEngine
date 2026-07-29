@@ -15,18 +15,18 @@ BoundingBox BoundingBox::Transform(const Matrix4x4& worldMatrix) const
 {
     if (!IsValid()) return BoundingBox();
 
-    // 1. Center, Extents 기반 Fast AABB Transformation (Jim Arvo)
+    //Center, Extents 기반 Fast AABB Transformation (Jim Arvo)
     Vector3 center = GetCenter();
     Vector3 extents = GetExtents();
 
-    // Translation 적용된 새로운 Center
+    //Translation 적용된 새로운 Center
     Vector3 newCenter(
         worldMatrix._41 + center.X * worldMatrix._11 + center.Y * worldMatrix._21 + center.Z * worldMatrix._31,
         worldMatrix._42 + center.X * worldMatrix._12 + center.Y * worldMatrix._22 + center.Z * worldMatrix._32,
         worldMatrix._43 + center.X * worldMatrix._13 + center.Y * worldMatrix._23 + center.Z * worldMatrix._33
     );
 
-    // 회전/스케일 행렬의 절대값을 적용한 새로운 Extents
+    //회전/스케일 행렬의 절대값을 적용한 새로운 Extents
     Vector3 newExtents(
         std::abs(worldMatrix._11) * extents.X + std::abs(worldMatrix._21) * extents.Y + std::abs(worldMatrix._31) * extents.Z,
         std::abs(worldMatrix._12) * extents.X + std::abs(worldMatrix._22) * extents.Y + std::abs(worldMatrix._32) * extents.Z,
@@ -44,13 +44,13 @@ bool BoundingBox::Intersects(const BoundingBox& other) const
     return true;
 }
 
-// Slab Method (슬랩 기법) 기반 Ray vs AABB 교차 판정
+//Slab Method (슬랩 기법) 기반 Ray vs AABB 교차 판정
 bool BoundingBox::Intersects(const Ray& ray, float& outDistance) const
 {
     float tMin = 0.0f;
     float tMax = (std::numeric_limits<float>::max)();
 
-    // X축 검사
+    //X축 검사
     if (std::abs(ray.Direction.X) < Math::SMALL_NUMBER)
     {
         if (ray.Origin.X < Min.X || ray.Origin.X > Max.X) return false;
@@ -67,7 +67,7 @@ bool BoundingBox::Intersects(const Ray& ray, float& outDistance) const
         if (tMin > tMax) return false;
     }
 
-    // Y축 검사
+    //Y축 검사
     if (std::abs(ray.Direction.Y) < Math::SMALL_NUMBER)
     {
         if (ray.Origin.Y < Min.Y || ray.Origin.Y > Max.Y) return false;
@@ -84,7 +84,7 @@ bool BoundingBox::Intersects(const Ray& ray, float& outDistance) const
         if (tMin > tMax) return false;
     }
 
-    // Z축 검사
+    //Z축 검사
     if (std::abs(ray.Direction.Z) < Math::SMALL_NUMBER)
     {
         if (ray.Origin.Z < Min.Z || ray.Origin.Z > Max.Z) return false;

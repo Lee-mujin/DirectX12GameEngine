@@ -135,9 +135,6 @@
     <ClInclude Include="ImGuiLayer.h">
       <Filter>Cores\h</Filter>
     </ClInclude>
-    <ClInclude Include="EditorState.h">
-      <Filter>Cores\h</Filter>
-    </ClInclude>
     <ClInclude Include="Inspector.h">
       <Filter>Editor</Filter>
     </ClInclude>
@@ -254,6 +251,12 @@
     </ClInclude>
     <ClInclude Include="BoundingSphere.h">
       <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="PickingSystem.h">
+      <Filter>Resource\h</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorState.h">
+      <Filter>Editor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -426,6 +429,9 @@
       <Filter>Resource\cpp</Filter>
     </ClCompile>
     <ClCompile Include="BoundingSphere.cpp">
+      <Filter>Resource\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="PickingSystem.cpp">
       <Filter>Resource\cpp</Filter>
     </ClCompile>
   </ItemGroup>

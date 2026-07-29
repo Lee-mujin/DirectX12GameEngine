@@ -17,7 +17,7 @@
 
 namespace
 {
-    // 범용 에셋 드롭 타겟 처리 헬퍼 (Content Browser 연동)
+    //범용 에셋 드롭 타겟 처리 헬퍼 (Content Browser 연동)
     std::optional<AssetHandle> HandleAssetDropTarget(ResourceManager& resourceManager)
     {
         if (ImGui::BeginDragDropTarget())
@@ -53,7 +53,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
 
     ImGui::PushID(selected.get());
 
-    // 1. Transform 영역
+    //Transform 영역
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
     {
         Transform& transform = selected->GetTransform();
@@ -77,14 +77,14 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
         }
     }
 
-    // 2. Material 영역 (✨ MaterialInstance 오버라이드 지원)
+    //Material 영역
     if (MeshRenderer* meshRenderer = selected->GetComponent<MeshRenderer>())
     {
         ImGui::PushID("MaterialComponent");
 
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            // MeshRenderer로부터 MaterialInstance 참조 획득
+            //MaterialInstance 참조 획득
             MaterialInstance& matInst = meshRenderer->GetMaterialInstance();
             std::shared_ptr<Material> parentMat = matInst.GetParent();
 
@@ -112,7 +112,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
                 matInst.SetShininess(shininess);
             }
 
-            // Base Color Texture
+            //Base Color Texture
             auto texture = matInst.GetTexture();
             if (texture)
             {
@@ -125,7 +125,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
                 ImGui::Dummy(ImVec2(64, 64));
             }
 
-            // Base Color Texture 드롭 처리 (AssetHandle 함께 보관)
+            //Base Color Texture 드롭 처리 (AssetHandle 함께 보관)
             if (auto handleOpt = HandleAssetDropTarget(resourceManager))
             {
                 if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
@@ -141,7 +141,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
 
             ImGui::Separator();
 
-            // Normal Map
+            //Normal Map
             auto normalTexture = matInst.GetNormalTexture();
             if (normalTexture)
             {
@@ -154,7 +154,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
                 ImGui::Dummy(ImVec2(64, 64));
             }
 
-            // Normal Map 드롭 처리 (AssetHandle 함께 보관)
+            //Normal Map 드롭 처리 (AssetHandle 함께 보관)
             if (auto handleOpt = HandleAssetDropTarget(resourceManager))
             {
                 if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
@@ -172,7 +172,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
         ImGui::PopID();
     }
 
-    // 3. Animator 영역
+    //Animator 영역
     if (AnimatorComponent* animator = selected->GetComponent<AnimatorComponent>())
     {
         ImGui::PushID("AnimatorComponent");
@@ -243,7 +243,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
         ImGui::PopID();
     }
 
-    // 인스펙터 패널 빈 곳 모델 에셋 드롭 처리 (ModelUtility 활용)
+    //인스펙터 패널 빈 곳 모델 에셋 드롭 처리
     ImGui::Dummy(ImGui::GetContentRegionAvail());
     if (auto handleOpt = HandleAssetDropTarget(resourceManager))
     {

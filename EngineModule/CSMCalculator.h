@@ -12,7 +12,7 @@ static constexpr UINT kCascadeCount = 3;
 struct CascadeData
 {
     std::array<Matrix4x4, kCascadeCount> ViewProjMatrices;
-    Vector3 SplitDistances; // x: Near Split, y: Mid Split, z: Far Split
+    Vector3 SplitDistances; //x: Near Split, y: Mid Split, z: Far Split
 };
 
 //Directional Light 및 Shadow Pass에서 사용되는 CSM 수학 연산 전용 클래스

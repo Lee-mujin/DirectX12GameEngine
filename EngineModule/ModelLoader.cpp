@@ -26,7 +26,7 @@ namespace
     {
         if (hasTangents)
         {
-            return; // 파일에 이미 있으면 계산 불필요
+            return; //파일에 이미 있으면 계산 불필요
         }
 
         std::vector<Vector3> tan1(vertices.size(), Vector3::Zero);
@@ -66,9 +66,9 @@ namespace
         for (size_t i = 0; i < vertices.size(); ++i)
         {
             Vector3 n(vertices[i].normal[0], vertices[i].normal[1], vertices[i].normal[2]);
-            Vector3 t = tan1[i]; // Gram-Schmidt 직교화: normal 성분 제거
+            Vector3 t = tan1[i]; //Gram-Schmidt 직교화: normal 성분 제거
 
-            // t가 Zero 벡터인 경우(UV가 비어있거나 문제 있는 경우) 방지
+            //t가 Zero 벡터인 경우(UV가 비어있거나 문제 있는 경우) 방지
             if (t.GetSizeSq() < 0.0001f)
             {
                 vertices[i].tangent[0] = 1.0f;
@@ -292,7 +292,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         }
     }
 
-    // 정점 데이터
+    //정점 데이터
     cgltf_accessor* positionAccessor = nullptr;
     cgltf_accessor* normalAccessor = nullptr;
     cgltf_accessor* tangentAccessor = nullptr;
@@ -499,6 +499,14 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
     auto result = std::make_shared<SkinnedMesh>();
     result->Create(device, uploadContext, vertices, indices);
     result->SetSkeleton(skeleton);
+
+    //SkinnedMesh의 BoundingBox를 정점 데이터로 직접 연산하여 주입
+    BoundingBox box;
+    for (const auto& v : vertices)
+    {
+        box.Encapsulate(Vector3(v.position[0], v.position[1], v.position[2]));
+    }
+    result->SetBoundingBox(box);
 
     return result;
 }

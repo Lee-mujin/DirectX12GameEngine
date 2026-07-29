@@ -15,5 +15,5 @@ public:
 
 private:
     std::weak_ptr<GameObject> mSelected; //Editor는 참조만 수행
-    bool mIsViewportFocused = false;     //Viewport 포커스 여부
+    bool mIsViewportFocused = false; //Viewport 포커스 여부
 };

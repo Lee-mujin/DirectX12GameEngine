@@ -19,7 +19,7 @@
 
 using Microsoft::WRL::ComPtr;
 
-// 루트 슬롯 번호 enum으로 상수화
+//루트 슬롯 번호 enum으로 상수화
 enum class RootSlot : UINT
 {
     ObjectCB = 0,
@@ -84,7 +84,7 @@ public:
     void TransitionToSwapChain();
     void SetDefaultWhiteTexture(std::shared_ptr<Texture> texture) { mDefaultWhiteTexture = texture; }
 
-    bool InitializeShadowMap(); // Initialize() 안에서 호출
+    bool InitializeShadowMap(); //Initialize() 안에서 호출
 
     //CSM Cascade Index 지원을 위해 cascadeIndex = 0 매개변수 추가
     void BeginShadowPass(const DirectionalLight& light, const Camera& camera, UINT cascadeIndex = 0);
@@ -207,7 +207,7 @@ private:
     ComPtr<ID3DBlob> mShadowVertexShader;
     ComPtr<ID3DBlob> mShadowSkinnedVertexShader;
     UINT mShadowDrawIndex = 0;
-    Matrix4x4 mLightViewProj; // Main Pass 셰이더에 넘길 때 씀
+    Matrix4x4 mLightViewProj; //Main Pass 셰이더에 넘길 때 씀
 
     bool mIsCommandListRecording = false;
 

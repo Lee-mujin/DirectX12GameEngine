@@ -59,3 +59,34 @@ Matrix4x4 Camera::GetProjection() const
 {
     return Matrix4x4::Perspective(mFovY, mAspect, mNearZ, mFarZ);
 }
+
+Ray Camera::ScreenPointToRay(const Vector2& screenPos, float viewportWidth, float viewportHeight) const
+{
+    if (viewportWidth <= 0.0f || viewportHeight <= 0.0f) return Ray();
+
+    //Screen Space (0~Width, 0~Height) -> NDC Space (-1~1, -1~1) 변환 (Y축 반전)
+    float ndcX = (2.0f * screenPos.X / viewportWidth) - 1.0f;
+    float ndcY = 1.0f - (2.0f * screenPos.Y / viewportHeight);
+
+    //View Space 상의 Ray Direction 계산
+    Matrix4x4 invProj = GetProjection().GetInverse();
+
+    //Near Clip Plane 상의 점과 Far Clip Plane 상의 점을 View Space로 변환
+    Vector3 rayStartView(
+        ndcX * invProj._11,
+        ndcY * invProj._22,
+        1.0f
+    );
+
+    //View Space -> World Space 변환 (View Matrix Inverse 적용)
+    Matrix4x4 invView = GetView().GetInverse();
+
+    //Direction을 World Space로 회전/변환
+    Vector3 rayDirWorld(
+        rayStartView.X * invView._11 + rayStartView.Y * invView._21 + rayStartView.Z * invView._31,
+        rayStartView.X * invView._12 + rayStartView.Y * invView._22 + rayStartView.Z * invView._32,
+        rayStartView.X * invView._13 + rayStartView.Y * invView._23 + rayStartView.Z * invView._33
+    );
+
+    return Ray(mPosition, rayDirWorld.GetNormalize());
+}

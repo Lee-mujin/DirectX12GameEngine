@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <vector>
 #include "Vertex.h"
+#include "BoundingBox.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -24,6 +25,8 @@ public:
     const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const { return mIndexBufferView; }
     UINT GetIndexCount() const { return mIndexCount; }
 
+    const BoundingBox& GetBoundingBox() const { return mBoundingBox; }
+    void SetBoundingBox(const BoundingBox& box) { mBoundingBox = box; }
 private:
     ComPtr<ID3D12Resource> mVertexBuffer;
     ComPtr<ID3D12Resource> mIndexBuffer;
@@ -37,4 +40,6 @@ private:
     UINT mIndexCount = 0;
 
     D3D12_RESOURCE_STATES mState = D3D12_RESOURCE_STATE_COMMON;
+
+    BoundingBox mBoundingBox;
 };

@@ -11,10 +11,10 @@ struct BoundingSphere
     BoundingSphere() = default;
     BoundingSphere(const Vector3& center, float radius) : Center(center), Radius(radius) {}
 
-    // World Matrix 변환
+    //World Matrix 변환
     BoundingSphere Transform(const Matrix4x4& worldMatrix) const;
 
-    // 교차 연산
+    //교차 연산
     bool Intersects(const BoundingSphere& other) const;
     bool Intersects(const Ray& ray, float& outDistance) const;
 };
