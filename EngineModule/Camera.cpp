@@ -49,12 +49,14 @@ void Camera::Update(Input* input, float deltaTime)
     if (input->IsKeyDown('Q')) mPosition -= Vector3::Up * moveDist;
 }
 
+//뷰행렬
 Matrix4x4 Camera::GetView() const
 {
     Vector3 forward = GetForward();
     return Matrix4x4::LookAt(mPosition, mPosition + forward, Vector3::Up);
 }
 
+//원근투영
 Matrix4x4 Camera::GetProjection() const
 {
     return Matrix4x4::Perspective(mFovY, mAspect, mNearZ, mFarZ);

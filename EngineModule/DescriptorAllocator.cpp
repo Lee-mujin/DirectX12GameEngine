@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "DescriptorAllocator.h"
 
+//비트맵 할당자
 bool DescriptorAllocator::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT capacity, bool shaderVisible)
 {
     mCapacity = capacity;
