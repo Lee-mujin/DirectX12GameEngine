@@ -3,17 +3,16 @@
 #include "UploadContext.h"
 #include "d3dx12.h"
 
-void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std::vector<Vertex>& vertices, const std::vector<UINT16>& indices)
+void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std::vector<Vertex>& vertices, const std::vector<UINT32>& indices)
 {
     const UINT vertexBufferSize = static_cast<UINT>(vertices.size() * sizeof(Vertex));
     mIndexCount = static_cast<UINT>(indices.size());
-    const UINT indexBufferSize = static_cast<UINT>(indices.size() * sizeof(UINT16));
+    const UINT indexBufferSize = static_cast<UINT>(indices.size() * sizeof(UINT32));
 
     CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT);
     CD3DX12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
     CD3DX12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
 
-    //COPY 큐와 Graphics 큐 공유를 위한 COMMON 상태 생성
     mState = D3D12_RESOURCE_STATE_COMMON;
 
     ThrowIfFailed(device->CreateCommittedResource(
@@ -45,7 +44,6 @@ void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std:
     memcpy(mappedIndex, indices.data(), indexBufferSize);
     mIndexUploadBuffer->Unmap(0, nullptr);
 
-    //Copy Queue에서는 복사만 수행
     uploadContext->Execute([this, vertexBufferSize, indexBufferSize](ID3D12GraphicsCommandList* cmdList) {
         cmdList->CopyBufferRegion(mVertexBuffer.Get(), 0, mVertexUploadBuffer.Get(), 0, vertexBufferSize);
         cmdList->CopyBufferRegion(mIndexBuffer.Get(), 0, mIndexUploadBuffer.Get(), 0, indexBufferSize);
@@ -56,10 +54,9 @@ void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std:
     mVertexBufferView.SizeInBytes = vertexBufferSize;
 
     mIndexBufferView.BufferLocation = mIndexBuffer->GetGPUVirtualAddress();
-    mIndexBufferView.Format = DXGI_FORMAT_R16_UINT;
+    mIndexBufferView.Format = DXGI_FORMAT_R32_UINT; //32비트 인덱스 포맷 지정
     mIndexBufferView.SizeInBytes = indexBufferSize;
 
-    //정점(Vertex) 데이터 순회로 Local BoundingBox 생성
     mBoundingBox = BoundingBox();
     for (const auto& vertex : vertices)
     {

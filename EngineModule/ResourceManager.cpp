@@ -9,6 +9,7 @@
 #include "Skeleton.h"
 #include "Animation.h"
 #include "Model.h"
+#include <algorithm>
 
 void ResourceManager::Initialize(D3D12Renderer* renderer, TextureLoader* textureLoader, UploadContext* uploadContext)
 {
@@ -16,7 +17,6 @@ void ResourceManager::Initialize(D3D12Renderer* renderer, TextureLoader* texture
     mTextureLoader = textureLoader;
     mUploadContext = uploadContext;
 
-    //AssetDatabase 기본 폴더 스캔 초기화
     mAssetDB.Initialize("Assets");
 }
 
@@ -24,47 +24,46 @@ std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
 {
     if (mCubeMesh) return mCubeMesh;
 
-    //Vertex 순서: { position, normal, tangent, color, uv }
     std::vector<Vertex> vertices =
     {
-        //Front Face (-Z) : Normal {0, 0, -1}, Tangent {1, 0, 0, 1}
+        // Front Face (-Z)
         { { -0.5f, -0.5f, -0.5f }, { 0, 0, -1 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 1.0f } },
         { { -0.5f,  0.5f, -0.5f }, { 0, 0, -1 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 0.0f } },
         { {  0.5f,  0.5f, -0.5f }, { 0, 0, -1 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 0.0f } },
         { {  0.5f, -0.5f, -0.5f }, { 0, 0, -1 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 1.0f } },
 
-        //Back Face (+Z) : Normal {0, 0, 1}, Tangent {-1, 0, 0, 1}
+        // Back Face (+Z)
         { {  0.5f, -0.5f,  0.5f }, { 0, 0, 1 }, { -1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 1.0f } },
         { {  0.5f,  0.5f,  0.5f }, { 0, 0, 1 }, { -1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 0.0f } },
         { { -0.5f,  0.5f,  0.5f }, { 0, 0, 1 }, { -1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 0.0f } },
         { { -0.5f, -0.5f,  0.5f }, { 0, 0, 1 }, { -1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 1.0f } },
 
-        //Left Face (-X) : Normal {-1, 0, 0}, Tangent {0, 0, 1, 1}
+        // Left Face (-X)
         { { -0.5f, -0.5f,  0.5f }, { -1, 0, 0 }, { 0, 0, 1, 1 }, { 1, 1, 1, 1 }, { 0.0f, 1.0f } },
         { { -0.5f,  0.5f,  0.5f }, { -1, 0, 0 }, { 0, 0, 1, 1 }, { 1, 1, 1, 1 }, { 0.0f, 0.0f } },
         { { -0.5f,  0.5f, -0.5f }, { -1, 0, 0 }, { 0, 0, 1, 1 }, { 1, 1, 1, 1 }, { 1.0f, 0.0f } },
         { { -0.5f, -0.5f, -0.5f }, { -1, 0, 0 }, { 0, 0, 1, 1 }, { 1, 1, 1, 1 }, { 1.0f, 1.0f } },
 
-        //Right Face (+X) : Normal {1, 0, 0}, Tangent {0, 0, -1, 1}
+        // Right Face (+X)
         { {  0.5f, -0.5f, -0.5f }, { 1, 0, 0 }, { 0, 0, -1, 1 }, { 1, 1, 1, 1 }, { 0.0f, 1.0f } },
         { {  0.5f,  0.5f, -0.5f }, { 1, 0, 0 }, { 0, 0, -1, 1 }, { 1, 1, 1, 1 }, { 0.0f, 0.0f } },
         { {  0.5f,  0.5f,  0.5f }, { 1, 0, 0 }, { 0, 0, -1, 1 }, { 1, 1, 1, 1 }, { 1.0f, 0.0f } },
         { {  0.5f, -0.5f,  0.5f }, { 1, 0, 0 }, { 0, 0, -1, 1 }, { 1, 1, 1, 1 }, { 1.0f, 1.0f } },
 
-        //Top Face (+Y) : Normal {0, 1, 0}, Tangent {1, 0, 0, 1}
+        // Top Face (+Y)
         { { -0.5f,  0.5f, -0.5f }, { 0, 1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 1.0f } },
         { { -0.5f,  0.5f,  0.5f }, { 0, 1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 0.0f } },
         { {  0.5f,  0.5f,  0.5f }, { 0, 1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 0.0f } },
         { {  0.5f,  0.5f, -0.5f }, { 0, 1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 1.0f } },
 
-        //Bottom Face (-Y) : Normal {0, -1, 0}, Tangent {1, 0, 0, 1}
+        // Bottom Face (-Y)
         { { -0.5f, -0.5f,  0.5f }, { 0, -1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 1.0f } },
         { { -0.5f, -0.5f, -0.5f }, { 0, -1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 0.0f, 0.0f } },
         { {  0.5f, -0.5f, -0.5f }, { 0, -1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 0.0f } },
         { {  0.5f, -0.5f,  0.5f }, { 0, -1, 0 }, { 1, 0, 0, 1 }, { 1, 1, 1, 1 }, { 1.0f, 1.0f } },
     };
 
-    std::vector<UINT16> indices =
+    std::vector<UINT32> indices =
     {
         0, 1, 2,  0, 2, 3,
         4, 5, 6,  4, 6, 7,
@@ -104,9 +103,24 @@ std::shared_ptr<Model> ResourceManager::GetOrLoadModel(AssetHandle handle)
     const std::string& path = GetPath(handle);
     if (path.empty()) return nullptr;
 
+    // 3D 모델 확장자 유효성 검사
+    std::string ext = "";
+    size_t dotPos = path.find_last_of('.');
+    if (dotPos != std::string::npos)
+    {
+        ext = path.substr(dotPos);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    }
+
+    if (ext != ".gltf" && ext != ".glb" && ext != ".fbx" && ext != ".obj")
+    {
+        return nullptr;
+    }
+
     auto model = std::make_shared<Model>();
     model->SetHandle(handle);
 
+    // 스킨드 메시 우선 시도 후 실패 시 정적 메시 폴백
     std::vector<std::shared_ptr<Animation>> animations;
     auto skinnedMesh = ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), mUploadContext, path, &animations);
 
@@ -146,10 +160,7 @@ std::shared_ptr<Texture> ResourceManager::GetOrLoadTexture(AssetHandle handle)
     if (!handle.IsValid()) return nullptr;
 
     auto it = mTextureCache.find(handle.GetId());
-    if (it != mTextureCache.end())
-    {
-        return it->second;
-    }
+    if (it != mTextureCache.end()) return it->second;
 
     const std::string& pathStr = GetPath(handle);
     if (pathStr.empty()) return nullptr;

@@ -164,13 +164,13 @@ std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
     auto obj = std::make_shared<GameObject>();
     obj->SetName(fsPath.stem().string());
 
-    //Mesh, Material 초기화, SourceHandle, Skinned/Static 구분을 한 번에 처리
+    // Mesh, Material 초기화, SourceHandle, Skinned/Static 구분을 한 번에 처리
     ModelUtility::ReplaceModel(*obj, model, handle);
 
     if (model->IsSkinned())
     {
         obj->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
-        obj->GetTransform().SetRotation(Vector3(90.0f, 0.0f, 0.0f));
+        obj->GetTransform().SetRotation(Vector3(-90.0f, 0.0f, 0.0f)); // 90.0f -> 0.0f로 변경
     }
 
     scene->AddGameObject(obj);

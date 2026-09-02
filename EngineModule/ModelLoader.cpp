@@ -2,511 +2,389 @@
 #include "ModelLoader.h"
 #include "Mesh.h"
 #include "Vertex.h"
-#include "../GameEngine/ThirdParty/cgltf.h"
 #include "SkinnedMesh.h"
 #include "Skeleton.h"
 #include "Animation.h"
 #include "UploadContext.h"
-#include <vector>
-#include <cmath>
+
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
+#include <unordered_map>
+#include <algorithm>
+#include <filesystem>
 
 namespace
 {
-    Matrix4x4 CgltfMatrixToOurMatrix(const cgltf_float m[16])
+    Matrix4x4 AssimpMatrixToOurMatrix(const aiMatrix4x4& m)
     {
         return Matrix4x4(
-            m[0], m[1], m[2], m[3],
-            m[4], m[5], m[6], m[7],
-            m[8], m[9], m[10], m[11],
-            m[12], m[13], m[14], m[15]);
+            m.a1, m.b1, m.c1, m.d1,
+            m.a2, m.b2, m.c2, m.d2,
+            m.a3, m.b3, m.c3, m.d3,
+            m.a4, m.b4, m.c4, m.d4
+        );
     }
 
-    //Tangent가 없는 파일일 경우 Lengyel's Method(Gram-Schmidt 직교화)로 계산
-    void ComputeTangentsIfMissing(std::vector<Vertex>& vertices, const std::vector<UINT16>& indices, bool hasTangents)
+    std::string ResolveValidPath(const std::string& inputPath)
     {
-        if (hasTangents)
+        namespace fs = std::filesystem;
+
+        if (fs::exists(inputPath) && !fs::is_directory(inputPath))
         {
-            return; //파일에 이미 있으면 계산 불필요
+            return fs::absolute(inputPath).string();
         }
 
-        std::vector<Vector3> tan1(vertices.size(), Vector3::Zero);
-        std::vector<Vector3> tan2(vertices.size(), Vector3::Zero);
-
-        for (size_t i = 0; i + 2 < indices.size(); i += 3)
+        std::string fallbackPath = "Assets/" + inputPath;
+        if (fs::exists(fallbackPath) && !fs::is_directory(fallbackPath))
         {
-            UINT16 i0 = indices[i], i1 = indices[i + 1], i2 = indices[i + 2];
+            return fs::absolute(fallbackPath).string();
+        }
 
-            Vector3 p0(vertices[i0].position[0], vertices[i0].position[1], vertices[i0].position[2]);
-            Vector3 p1(vertices[i1].position[0], vertices[i1].position[1], vertices[i1].position[2]);
-            Vector3 p2(vertices[i2].position[0], vertices[i2].position[1], vertices[i2].position[2]);
+        std::string fileName = fs::path(inputPath).filename().string();
+        std::string fallbackName = "Assets/" + fileName;
+        if (fs::exists(fallbackName) && !fs::is_directory(fallbackName))
+        {
+            return fs::absolute(fallbackName).string();
+        }
+        return "";
+    }
 
-            Vector2 uv0(vertices[i0].uv[0], vertices[i0].uv[1]);
-            Vector2 uv1(vertices[i1].uv[0], vertices[i1].uv[1]);
-            Vector2 uv2(vertices[i2].uv[0], vertices[i2].uv[1]);
+    //메시 지오메트리(Position, Normal, Tangent, UV) 공통 추출 함수
+    void ExtractGeometry(const aiScene* scene, std::vector<Vertex>& outVertices, std::vector<UINT32>& outIndices, std::vector<UINT32>& outMeshOffsets)
+    {
+        UINT32 currentOffset = 0;
+        outMeshOffsets.resize(scene->mNumMeshes);
 
-            Vector3 edge1 = p1 - p0;
-            Vector3 edge2 = p2 - p0;
-            float du1 = uv1.X - uv0.X, dv1 = uv1.Y - uv0.Y;
-            float du2 = uv2.X - uv0.X, dv2 = uv2.Y - uv0.Y;
+        for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
+        {
+            const aiMesh* mesh = scene->mMeshes[m];
+            outMeshOffsets[m] = currentOffset;
 
-            float denom = du1 * dv2 - du2 * dv1;
-            if (std::fabsf(denom) < 0.0001f)
+            for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
             {
-                continue; // UV 퇴화 삼각형, 스킵
+                Vertex v = {};
+                v.position[0] = mesh->mVertices[i].x;
+                v.position[1] = mesh->mVertices[i].y;
+                v.position[2] = mesh->mVertices[i].z;
+
+                if (mesh->HasNormals())
+                {
+                    v.normal[0] = mesh->mNormals[i].x;
+                    v.normal[1] = mesh->mNormals[i].y;
+                    v.normal[2] = mesh->mNormals[i].z;
+                }
+
+                if (mesh->HasTangentsAndBitangents())
+                {
+                    v.tangent[0] = mesh->mTangents[i].x;
+                    v.tangent[1] = mesh->mTangents[i].y;
+                    v.tangent[2] = mesh->mTangents[i].z;
+                    v.tangent[3] = 1.0f;
+                }
+                else
+                {
+                    v.tangent[0] = 1.0f;
+                    v.tangent[3] = 1.0f;
+                }
+
+                if (mesh->HasTextureCoords(0))
+                {
+                    v.uv[0] = mesh->mTextureCoords[0][i].x;
+                    v.uv[1] = mesh->mTextureCoords[0][i].y;
+                }
+
+                v.color[0] = v.color[1] = v.color[2] = v.color[3] = 1.0f;
+                outVertices.push_back(v);
             }
-            float r = 1.0f / denom;
 
-            Vector3 sdir = (edge1 * dv2 - edge2 * dv1) * r;
-            Vector3 tdir = (edge2 * du1 - edge1 * du2) * r;
-
-            tan1[i0] += sdir; tan1[i1] += sdir; tan1[i2] += sdir;
-            tan2[i0] += tdir; tan2[i1] += tdir; tan2[i2] += tdir;
-        }
-
-        for (size_t i = 0; i < vertices.size(); ++i)
-        {
-            Vector3 n(vertices[i].normal[0], vertices[i].normal[1], vertices[i].normal[2]);
-            Vector3 t = tan1[i]; //Gram-Schmidt 직교화: normal 성분 제거
-
-            //t가 Zero 벡터인 경우(UV가 비어있거나 문제 있는 경우) 방지
-            if (t.GetSizeSq() < 0.0001f)
+            for (unsigned int f = 0; f < mesh->mNumFaces; ++f)
             {
-                vertices[i].tangent[0] = 1.0f;
-                vertices[i].tangent[1] = 0.0f;
-                vertices[i].tangent[2] = 0.0f;
-                vertices[i].tangent[3] = 1.0f;
-                continue;
+                const aiFace& face = mesh->mFaces[f];
+                if (face.mNumIndices == 3)
+                {
+                    outIndices.push_back(currentOffset + face.mIndices[0]);
+                    outIndices.push_back(currentOffset + face.mIndices[1]);
+                    outIndices.push_back(currentOffset + face.mIndices[2]);
+                }
             }
 
-            Vector3 tangent = (t - n * Vector3::Dot(n, t)).GetNormalize();
-
-            float handedness = (Vector3::Dot(Vector3::Cross(n, tangent), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
-
-            vertices[i].tangent[0] = tangent.X;
-            vertices[i].tangent[1] = tangent.Y;
-            vertices[i].tangent[2] = tangent.Z;
-            vertices[i].tangent[3] = handedness;
+            currentOffset += mesh->mNumVertices;
         }
+    }
+
+    BoundingBox CalculateBounds(const std::vector<Vertex>& vertices)
+    {
+        BoundingBox box;
+        for (const auto& v : vertices)
+        {
+            box.Encapsulate(Vector3(v.position[0], v.position[1], v.position[2]));
+        }
+        return box;
     }
 }
 
-std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(ID3D12Device* device, UploadContext* uploadContext, const std::string& path)
+//LoadStaticMesh
+std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(
+    ID3D12Device* device,
+    UploadContext* uploadContext,
+    const std::string& path)
 {
-    cgltf_options options = {};
-    cgltf_data* data = nullptr;
+    std::string validPath = ResolveValidPath(path);
+    if (validPath.empty()) return nullptr;
 
-    if (cgltf_parse_file(&options, path.c_str(), &data) != cgltf_result_success)
+    Assimp::Importer importer;
+    unsigned int flags =
+        aiProcess_Triangulate |
+        aiProcess_GenSmoothNormals |
+        aiProcess_CalcTangentSpace |
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_ConvertToLeftHanded;
+
+    const aiScene* scene = nullptr;
+    try
+    {
+        scene = importer.ReadFile(validPath, flags);
+    }
+    catch (...)
     {
         return nullptr;
     }
 
-    if (cgltf_load_buffers(&options, data, path.c_str()) != cgltf_result_success)
+    if (!scene || !scene->mRootNode || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE))
     {
-        cgltf_free(data);
         return nullptr;
     }
-
-    if (data->meshes_count == 0 || data->meshes[0].primitives_count == 0)
-    {
-        cgltf_free(data);
-        return nullptr;
-    }
-
-    const cgltf_primitive& primitive = data->meshes[0].primitives[0];
 
     std::vector<Vertex> vertices;
-    std::vector<UINT16> indices;
+    std::vector<UINT32> indices;
+    std::vector<UINT32> meshOffsets;
+    ExtractGeometry(scene, vertices, indices, meshOffsets);
 
-    cgltf_accessor* positionAccessor = nullptr;
-    cgltf_accessor* normalAccessor = nullptr;
-    cgltf_accessor* tangentAccessor = nullptr;
-    cgltf_accessor* uvAccessor = nullptr;
-
-    for (size_t i = 0; i < primitive.attributes_count; ++i)
-    {
-        const cgltf_attribute& attr = primitive.attributes[i];
-
-        if (attr.type == cgltf_attribute_type_position)
-        {
-            positionAccessor = attr.data;
-        }
-        else if (attr.type == cgltf_attribute_type_normal)
-        {
-            normalAccessor = attr.data;
-        }
-        else if (attr.type == cgltf_attribute_type_tangent)
-        {
-            tangentAccessor = attr.data;
-        }
-        else if (attr.type == cgltf_attribute_type_texcoord && uvAccessor == nullptr)
-        {
-            uvAccessor = attr.data;
-        }
-    }
-
-    if (!positionAccessor)
-    {
-        cgltf_free(data);
-        return nullptr;
-    }
-
-    size_t vertexCount = positionAccessor->count;
-    vertices.resize(vertexCount);
-
-    for (size_t i = 0; i < vertexCount; ++i)
-    {
-        float pos[3] = {};
-        cgltf_accessor_read_float(positionAccessor, i, pos, 3);
-        vertices[i].position[0] = pos[0];
-        vertices[i].position[1] = pos[1];
-        vertices[i].position[2] = pos[2];
-
-        if (normalAccessor)
-        {
-            float normal[3] = {};
-            cgltf_accessor_read_float(normalAccessor, i, normal, 3);
-            vertices[i].normal[0] = normal[0];
-            vertices[i].normal[1] = normal[1];
-            vertices[i].normal[2] = normal[2];
-        }
-
-        if (tangentAccessor)
-        {
-            float tan[4] = {};
-            cgltf_accessor_read_float(tangentAccessor, i, tan, 4);
-            vertices[i].tangent[0] = tan[0];
-            vertices[i].tangent[1] = tan[1];
-            vertices[i].tangent[2] = tan[2];
-            vertices[i].tangent[3] = tan[3];
-        }
-
-        if (uvAccessor)
-        {
-            float uv[2] = {};
-            cgltf_accessor_read_float(uvAccessor, i, uv, 2);
-            vertices[i].uv[0] = uv[0];
-            vertices[i].uv[1] = uv[1];
-        }
-
-        vertices[i].color[0] = 1.0f;
-        vertices[i].color[1] = 1.0f;
-        vertices[i].color[2] = 1.0f;
-        vertices[i].color[3] = 1.0f;
-    }
-
-    if (primitive.indices)
-    {
-        size_t indexCount = primitive.indices->count;
-        indices.resize(indexCount);
-
-        for (size_t i = 0; i < indexCount; ++i)
-        {
-            indices[i] = static_cast<UINT16>(cgltf_accessor_read_index(primitive.indices, i));
-        }
-    }
-
-    cgltf_free(data);
-
-    //메쉬 생성 직전, Tangent 데이터가 없으면 자동 계산
-    ComputeTangentsIfMissing(vertices, indices, tangentAccessor != nullptr);
+    if (vertices.empty() || indices.empty()) return nullptr;
 
     auto result = std::make_shared<Mesh>();
     result->Create(device, uploadContext, vertices, indices);
+    result->SetBoundingBox(CalculateBounds(vertices));
+
     return result;
 }
 
+//LoadSkinnedMesh
 std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
-    ID3D12Device* device, UploadContext* uploadContext, const std::string& path,
+    ID3D12Device* device,
+    UploadContext* uploadContext,
+    const std::string& path,
     std::vector<std::shared_ptr<Animation>>* outAnimations)
 {
-    if (outAnimations)
+    if (outAnimations) outAnimations->clear();
+
+    std::string validPath = ResolveValidPath(path);
+    if (validPath.empty()) return nullptr;
+
+    Assimp::Importer importer;
+    unsigned int flags =
+        aiProcess_Triangulate |
+        aiProcess_GenSmoothNormals |
+        aiProcess_CalcTangentSpace |
+        aiProcess_LimitBoneWeights |
+        aiProcess_ConvertToLeftHanded;
+
+    const aiScene* scene = nullptr;
+    try
     {
-        outAnimations->clear();
+        scene = importer.ReadFile(validPath, flags);
     }
-
-    cgltf_options options = {};
-    cgltf_data* data = nullptr;
-
-    if (cgltf_parse_file(&options, path.c_str(), &data) != cgltf_result_success)
+    catch (...)
     {
         return nullptr;
     }
 
-    if (cgltf_load_buffers(&options, data, path.c_str()) != cgltf_result_success)
+    if (!scene || !scene->mRootNode || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE))
     {
-        cgltf_free(data);
         return nullptr;
     }
 
-    if (data->meshes_count == 0 || data->meshes[0].primitives_count == 0 || data->skins_count == 0)
+    //버텍스에 영향을 주는 실제 본 개수 확인
+    unsigned int totalBoneCount = 0;
+    for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
     {
-        cgltf_free(data);
+        totalBoneCount += scene->mMeshes[m]->mNumBones;
+    }
+
+    if (totalBoneCount == 0)
+    {
         return nullptr;
     }
 
-    const cgltf_primitive& primitive = data->meshes[0].primitives[0];
-    const cgltf_skin& skin = data->skins[0];
+    //공통 지오메트리 추출
+    std::vector<Vertex> vertices;
+    std::vector<UINT32> indices;
+    std::vector<UINT32> meshOffsets;
+    ExtractGeometry(scene, vertices, indices, meshOffsets);
 
-    // Skeleton 구성
+    if (vertices.empty() || indices.empty()) return nullptr;
+
     auto skeleton = std::make_shared<Skeleton>();
-    skeleton->Bones.resize(skin.joints_count);
+    std::unordered_map<std::string, int> boneMapping;
 
-    for (size_t i = 0; i < skin.joints_count; ++i)
+    //메시의 본 오프셋 행렬 매핑 테이블 생성
+    for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
     {
-        cgltf_node* joint = skin.joints[i];
-        skeleton->Bones[i].Name = joint->name ? joint->name : "";
-
-        float offsetMat[16] = {};
-        cgltf_accessor_read_float(skin.inverse_bind_matrices, i, offsetMat, 16);
-        skeleton->Bones[i].OffsetMatrix = CgltfMatrixToOurMatrix(offsetMat);
-
-        Vector3 pos(joint->translation[0], joint->translation[1], joint->translation[2]);
-        Quaternion rot(joint->rotation[0], joint->rotation[1], joint->rotation[2], joint->rotation[3]);
-        rot.Normalize();
-        Vector3 scale(joint->scale[0], joint->scale[1], joint->scale[2]);
-
-        skeleton->Bones[i].LocalBindTransform =
-            Matrix4x4::Scale(scale) * Matrix4x4::Rotate(rot) * Matrix4x4::Translate(pos);
-
-        skeleton->Bones[i].BindPosition = pos;
-        skeleton->Bones[i].BindRotation = rot;
-        skeleton->Bones[i].BindScale = scale;
-
-        skeleton->Bones[i].ParentIndex = -1;
-
-        cgltf_node* searchParent = joint->parent;
-        while (searchParent != nullptr)
+        const aiMesh* mesh = scene->mMeshes[m];
+        for (unsigned int b = 0; b < mesh->mNumBones; ++b)
         {
-            bool found = false;
-            for (size_t p = 0; p < skin.joints_count; ++p)
+            std::string boneName = mesh->mBones[b]->mName.C_Str();
+            if (boneMapping.find(boneName) == boneMapping.end())
             {
-                if (skin.joints[p] == searchParent)
+                int newIdx = static_cast<int>(skeleton->Bones.size());
+                boneMapping[boneName] = newIdx;
+
+                skeleton->Bones.emplace_back();
+                auto& bone = skeleton->Bones.back();
+                bone.Name = boneName;
+                bone.OffsetMatrix = AssimpMatrixToOurMatrix(mesh->mBones[b]->mOffsetMatrix);
+                bone.ParentIndex = -1;
+                bone.LocalBindTransform = Matrix4x4::Identity;
+            }
+        }
+    }
+
+    //노드 트리를 순회하며 부모 관계 및 바인드 TRS 세팅
+    auto MapHierarchy = [&](auto& self, const aiNode* node, int parentIdx) -> void
+        {
+            std::string name = node->mName.C_Str();
+            int currentIdx = parentIdx;
+
+            if (boneMapping.find(name) != boneMapping.end())
+            {
+                currentIdx = boneMapping[name];
+                auto& bone = skeleton->Bones[currentIdx];
+                bone.ParentIndex = parentIdx;
+                bone.LocalBindTransform = AssimpMatrixToOurMatrix(node->mTransformation);
+
+                aiVector3D scale, pos;
+                aiQuaternion rot;
+                node->mTransformation.Decompose(scale, rot, pos);
+                bone.BindPosition = Vector3(pos.x, pos.y, pos.z);
+                bone.BindRotation = Quaternion(rot.x, rot.y, rot.z, rot.w);
+                bone.BindScale = Vector3(scale.x, scale.y, scale.z);
+            }
+
+            for (unsigned int c = 0; c < node->mNumChildren; ++c)
+            {
+                self(self, node->mChildren[c], currentIdx);
+            }
+        };
+
+    MapHierarchy(MapHierarchy, scene->mRootNode, -1);
+
+    //정점에 본 인덱스와 가중치 할당
+    for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
+    {
+        const aiMesh* mesh = scene->mMeshes[m];
+        UINT32 baseOffset = meshOffsets[m];
+
+        for (unsigned int b = 0; b < mesh->mNumBones; ++b)
+        {
+            const aiBone* bone = mesh->mBones[b];
+            int bIdx = boneMapping[bone->mName.C_Str()];
+
+            for (unsigned int w = 0; w < bone->mNumWeights; ++w)
+            {
+                UINT32 targetVertexId = baseOffset + bone->mWeights[w].mVertexId;
+                float weight = bone->mWeights[w].mWeight;
+
+                for (int slot = 0; slot < 4; ++slot)
                 {
-                    skeleton->Bones[i].ParentIndex = static_cast<int>(p);
-                    found = true;
-                    break;
+                    if (vertices[targetVertexId].boneWeights[slot] == 0.0f)
+                    {
+                        vertices[targetVertexId].boneIndices[slot] = static_cast<UINT>(bIdx);
+                        vertices[targetVertexId].boneWeights[slot] = weight;
+                        break;
+                    }
                 }
             }
-            if (found) break;
-            searchParent = searchParent->parent;
         }
     }
 
-    //정점 데이터
-    cgltf_accessor* positionAccessor = nullptr;
-    cgltf_accessor* normalAccessor = nullptr;
-    cgltf_accessor* tangentAccessor = nullptr;
-    cgltf_accessor* uvAccessor = nullptr;
-    cgltf_accessor* jointsAccessor = nullptr;
-    cgltf_accessor* weightsAccessor = nullptr;
-
-    for (size_t i = 0; i < primitive.attributes_count; ++i)
+    //가중치 정규화
+    for (auto& v : vertices)
     {
-        const cgltf_attribute& attr = primitive.attributes[i];
-        switch (attr.type)
+        float sum = v.boneWeights[0] + v.boneWeights[1] + v.boneWeights[2] + v.boneWeights[3];
+        if (sum > 0.0001f)
         {
-        case cgltf_attribute_type_position: positionAccessor = attr.data; break;
-        case cgltf_attribute_type_normal: normalAccessor = attr.data; break;
-        case cgltf_attribute_type_tangent: tangentAccessor = attr.data; break;
-        case cgltf_attribute_type_texcoord: if (!uvAccessor) uvAccessor = attr.data; break;
-        case cgltf_attribute_type_joints: if (!jointsAccessor) jointsAccessor = attr.data; break;
-        case cgltf_attribute_type_weights: if (!weightsAccessor) weightsAccessor = attr.data; break;
-        default: break;
+            v.boneWeights[0] /= sum;
+            v.boneWeights[1] /= sum;
+            v.boneWeights[2] /= sum;
+            v.boneWeights[3] /= sum;
+        }
+        else
+        {
+            v.boneIndices[0] = 0;
+            v.boneWeights[0] = 1.0f;
         }
     }
 
-    if (!positionAccessor || !jointsAccessor || !weightsAccessor)
+    //애니메이션 트랙 파싱
+    if (outAnimations && scene->HasAnimations())
     {
-        cgltf_free(data);
-        return nullptr;
-    }
-
-    size_t vertexCount = positionAccessor->count;
-    std::vector<Vertex> vertices(vertexCount);
-
-    for (size_t i = 0; i < vertexCount; ++i)
-    {
-        float pos[3] = {};
-        cgltf_accessor_read_float(positionAccessor, i, pos, 3);
-        vertices[i].position[0] = pos[0];
-        vertices[i].position[1] = pos[1];
-        vertices[i].position[2] = pos[2];
-
-        if (normalAccessor)
+        for (unsigned int a = 0; a < scene->mNumAnimations; ++a)
         {
-            float normal[3] = {};
-            cgltf_accessor_read_float(normalAccessor, i, normal, 3);
-            vertices[i].normal[0] = normal[0];
-            vertices[i].normal[1] = normal[1];
-            vertices[i].normal[2] = normal[2];
-        }
-
-        if (tangentAccessor)
-        {
-            float tan[4] = {};
-            cgltf_accessor_read_float(tangentAccessor, i, tan, 4);
-            vertices[i].tangent[0] = tan[0];
-            vertices[i].tangent[1] = tan[1];
-            vertices[i].tangent[2] = tan[2];
-            vertices[i].tangent[3] = tan[3]; // handedness
-        }
-
-        if (uvAccessor)
-        {
-            float uv[2] = {};
-            cgltf_accessor_read_float(uvAccessor, i, uv, 2);
-            vertices[i].uv[0] = uv[0];
-            vertices[i].uv[1] = uv[1];
-        }
-
-        vertices[i].color[0] = vertices[i].color[1] = vertices[i].color[2] = vertices[i].color[3] = 1.0f;
-
-        cgltf_uint joints[4] = {};
-        cgltf_accessor_read_uint(jointsAccessor, i, joints, 4);
-        vertices[i].boneIndices[0] = joints[0];
-        vertices[i].boneIndices[1] = joints[1];
-        vertices[i].boneIndices[2] = joints[2];
-        vertices[i].boneIndices[3] = joints[3];
-
-        float weights[4] = {};
-        cgltf_accessor_read_float(weightsAccessor, i, weights, 4);
-
-        float weightSum = weights[0] + weights[1] + weights[2] + weights[3];
-        if (weightSum > 0.0001f)
-        {
-            weights[0] /= weightSum;
-            weights[1] /= weightSum;
-            weights[2] /= weightSum;
-            weights[3] /= weightSum;
-        }
-
-        vertices[i].boneWeights[0] = weights[0];
-        vertices[i].boneWeights[1] = weights[1];
-        vertices[i].boneWeights[2] = weights[2];
-        vertices[i].boneWeights[3] = weights[3];
-    }
-
-    std::vector<UINT16> indices;
-    if (primitive.indices)
-    {
-        size_t indexCount = primitive.indices->count;
-        indices.resize(indexCount);
-        for (size_t i = 0; i < indexCount; ++i)
-        {
-            indices[i] = static_cast<UINT16>(cgltf_accessor_read_index(primitive.indices, i));
-        }
-    }
-
-    // 애니메이션
-    if (outAnimations && data->animations_count > 0)
-    {
-        for (size_t a = 0; a < data->animations_count; ++a)
-        {
-            const cgltf_animation& srcAnim = data->animations[a];
-
+            const aiAnimation* srcAnim = scene->mAnimations[a];
             auto animation = std::make_shared<Animation>();
-            animation->Name = srcAnim.name ? srcAnim.name : ("Animation_" + std::to_string(a));
+            animation->Name = (srcAnim->mName.length > 0) ? srcAnim->mName.C_Str() : ("Animation_" + std::to_string(a));
+
+            double ticks = srcAnim->mTicksPerSecond != 0.0 ? srcAnim->mTicksPerSecond : 25.0;
+            animation->Duration = static_cast<float>(srcAnim->mDuration / ticks);
+
             animation->Channels.resize(skeleton->Bones.size());
             for (size_t i = 0; i < skeleton->Bones.size(); ++i)
             {
                 animation->Channels[i].BoneIndex = static_cast<int>(i);
             }
 
-            float maxTime = 0.0f;
-            int matchedChannelCount = 0;
-
-            for (size_t c = 0; c < srcAnim.channels_count; ++c)
+            for (unsigned int c = 0; c < srcAnim->mNumChannels; ++c)
             {
-                const cgltf_animation_channel& channel = srcAnim.channels[c];
-                const cgltf_animation_sampler& sampler = *channel.sampler;
-                cgltf_node* targetNode = channel.target_node;
+                const aiNodeAnim* channel = srcAnim->mChannels[c];
+                std::string target = channel->mNodeName.C_Str();
 
-                int boneIndex = -1;
-                for (size_t b = 0; b < skin.joints_count; ++b)
+                if (boneMapping.find(target) == boneMapping.end()) continue;
+                int bIdx = boneMapping[target];
+
+                BoneKeyframes& keyframes = animation->Channels[bIdx];
+
+                for (unsigned int k = 0; k < channel->mNumPositionKeys; ++k)
                 {
-                    if (skin.joints[b] == targetNode)
-                    {
-                        boneIndex = static_cast<int>(b);
-                        break;
-                    }
+                    keyframes.PositionTimes.push_back(static_cast<float>(channel->mPositionKeys[k].mTime / ticks));
+                    aiVector3D p = channel->mPositionKeys[k].mValue;
+                    keyframes.Positions.push_back(Vector3(p.x, p.y, p.z));
                 }
 
-                if (boneIndex < 0)
+                for (unsigned int k = 0; k < channel->mNumRotationKeys; ++k)
                 {
-                    continue;
-                }
-                ++matchedChannelCount;
-
-                size_t keyCount = sampler.input->count;
-                std::vector<float> times(keyCount);
-                for (size_t k = 0; k < keyCount; ++k)
-                {
-                    cgltf_accessor_read_float(sampler.input, k, &times[k], 1);
-                    maxTime = (times[k] > maxTime) ? times[k] : maxTime;
+                    keyframes.RotationTimes.push_back(static_cast<float>(channel->mRotationKeys[k].mTime / ticks));
+                    aiQuaternion r = channel->mRotationKeys[k].mValue;
+                    keyframes.Rotations.push_back(Quaternion(r.x, r.y, r.z, r.w));
                 }
 
-                BoneKeyframes& boneChannel = animation->Channels[boneIndex];
-
-                if (channel.target_path == cgltf_animation_path_type_translation)
+                for (unsigned int k = 0; k < channel->mNumScalingKeys; ++k)
                 {
-                    boneChannel.PositionTimes = times;
-                    boneChannel.Positions.resize(keyCount);
-                    for (size_t k = 0; k < keyCount; ++k)
-                    {
-                        float v[3] = {};
-                        cgltf_accessor_read_float(sampler.output, k, v, 3);
-                        boneChannel.Positions[k] = Vector3(v[0], v[1], v[2]);
-                    }
-                }
-                else if (channel.target_path == cgltf_animation_path_type_rotation)
-                {
-                    boneChannel.RotationTimes = times;
-                    boneChannel.Rotations.resize(keyCount);
-                    for (size_t k = 0; k < keyCount; ++k)
-                    {
-                        float v[4] = {};
-                        cgltf_accessor_read_float(sampler.output, k, v, 4);
-                        boneChannel.Rotations[k] = Quaternion(v[0], v[1], v[2], v[3]);
-                    }
-                }
-                else if (channel.target_path == cgltf_animation_path_type_scale)
-                {
-                    boneChannel.ScaleTimes = times;
-                    boneChannel.Scales.resize(keyCount);
-                    for (size_t k = 0; k < keyCount; ++k)
-                    {
-                        float v[3] = {};
-                        cgltf_accessor_read_float(sampler.output, k, v, 3);
-                        boneChannel.Scales[k] = Vector3(v[0], v[1], v[2]);
-                    }
+                    keyframes.ScaleTimes.push_back(static_cast<float>(channel->mScalingKeys[k].mTime / ticks));
+                    aiVector3D s = channel->mScalingKeys[k].mValue;
+                    keyframes.Scales.push_back(Vector3(s.x, s.y, s.z));
                 }
             }
 
-            animation->Duration = maxTime;
-
-            if (matchedChannelCount > 0)
-            {
-                outAnimations->push_back(animation);
-            }
+            outAnimations->push_back(animation);
         }
     }
-
-    cgltf_free(data);
-
-    //스키니드 메쉬 생성 직전, Tangent 데이터가 없으면 자동 계산
-    ComputeTangentsIfMissing(vertices, indices, tangentAccessor != nullptr);
 
     auto result = std::make_shared<SkinnedMesh>();
     result->Create(device, uploadContext, vertices, indices);
     result->SetSkeleton(skeleton);
-
-    //SkinnedMesh의 BoundingBox를 정점 데이터로 직접 연산하여 주입
-    BoundingBox box;
-    for (const auto& v : vertices)
-    {
-        box.Encapsulate(Vector3(v.position[0], v.position[1], v.position[2]));
-    }
-    result->SetBoundingBox(box);
+    result->SetBoundingBox(CalculateBounds(vertices));
 
     return result;
 }
