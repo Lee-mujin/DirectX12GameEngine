@@ -6,6 +6,9 @@
 #include "Skeleton.h"
 #include "Animation.h"
 #include "UploadContext.h"
+#include "Material.h"
+#include "TextureLoader.h"
+#include "Texture.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -51,16 +54,28 @@ namespace
         return "";
     }
 
-    //메시 지오메트리(Position, Normal, Tangent, UV) 공통 추출 함수
-    void ExtractGeometry(const aiScene* scene, std::vector<Vertex>& outVertices, std::vector<UINT32>& outIndices, std::vector<UINT32>& outMeshOffsets)
+    //메시 지오메트리(Position, Normal, Tangent, UV) 및 서브메시 추출 함수
+    void ExtractGeometry(
+        const aiScene* scene,
+        std::vector<Vertex>& outVertices,
+        std::vector<UINT32>& outIndices,
+        std::vector<UINT32>& outMeshOffsets,
+        std::vector<SubMesh>& outSubMeshes)
     {
         UINT32 currentOffset = 0;
         outMeshOffsets.resize(scene->mNumMeshes);
+        outSubMeshes.clear();
+        outSubMeshes.reserve(scene->mNumMeshes);
 
         for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
         {
             const aiMesh* mesh = scene->mMeshes[m];
             outMeshOffsets[m] = currentOffset;
+
+            SubMesh subMesh;
+            subMesh.IndexStart = static_cast<UINT>(outIndices.size());
+            subMesh.BaseVertexLocation = static_cast<INT>(currentOffset);
+            subMesh.MaterialIndex = mesh->mMaterialIndex;
 
             for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
             {
@@ -68,6 +83,8 @@ namespace
                 v.position[0] = mesh->mVertices[i].x;
                 v.position[1] = mesh->mVertices[i].y;
                 v.position[2] = mesh->mVertices[i].z;
+
+                subMesh.Bounds.Encapsulate(Vector3(v.position[0], v.position[1], v.position[2]));
 
                 if (mesh->HasNormals())
                 {
@@ -81,7 +98,19 @@ namespace
                     v.tangent[0] = mesh->mTangents[i].x;
                     v.tangent[1] = mesh->mTangents[i].y;
                     v.tangent[2] = mesh->mTangents[i].z;
-                    v.tangent[3] = 1.0f;
+
+                    if (mesh->HasNormals())
+                    {
+                        aiVector3D n = mesh->mNormals[i];
+                        aiVector3D t = mesh->mTangents[i];
+                        aiVector3D b = mesh->mBitangents[i];
+                        aiVector3D cross = n ^ t;
+                        v.tangent[3] = ((cross * b) < 0.0f) ? -1.0f : 1.0f;
+                    }
+                    else
+                    {
+                        v.tangent[3] = 1.0f;
+                    }
                 }
                 else
                 {
@@ -99,16 +128,20 @@ namespace
                 outVertices.push_back(v);
             }
 
+            //로컬 인덱스(0부터 시작) 그대로 저장 (DirectX 12 BaseVertexLocation 활용)
             for (unsigned int f = 0; f < mesh->mNumFaces; ++f)
             {
                 const aiFace& face = mesh->mFaces[f];
                 if (face.mNumIndices == 3)
                 {
-                    outIndices.push_back(currentOffset + face.mIndices[0]);
-                    outIndices.push_back(currentOffset + face.mIndices[1]);
-                    outIndices.push_back(currentOffset + face.mIndices[2]);
+                    outIndices.push_back(face.mIndices[0]);
+                    outIndices.push_back(face.mIndices[1]);
+                    outIndices.push_back(face.mIndices[2]);
                 }
             }
+
+            subMesh.IndexCount = static_cast<UINT>(outIndices.size()) - subMesh.IndexStart;
+            outSubMeshes.push_back(subMesh);
 
             currentOffset += mesh->mNumVertices;
         }
@@ -125,12 +158,147 @@ namespace
     }
 }
 
+//LoadMaterials
+std::vector<std::shared_ptr<Material>> ModelLoader::LoadMaterials(
+    const aiScene* scene,
+    const std::string& modelPath,
+    TextureLoader* textureLoader)
+{
+    if (!scene || scene->mNumMaterials == 0)
+    {
+        return {};
+    }
+
+    std::vector<std::shared_ptr<Material>> materials;
+    materials.reserve(scene->mNumMaterials);
+
+    std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
+
+    auto LoadTextureFromAssimp = [&](const aiString& texPath) -> std::shared_ptr<Texture>
+    {
+        if (texPath.length == 0 || !textureLoader) return nullptr;
+        std::string pathStr = texPath.C_Str();
+
+        auto it = textureCache.find(pathStr);
+        if (it != textureCache.end()) return it->second;
+
+        std::shared_ptr<Texture> loadedTexture = nullptr;
+
+        // 1) 임베디드 텍스처 (*0, *1 등 또는 scene->GetEmbeddedTexture)
+        const aiTexture* embeddedTex = scene->GetEmbeddedTexture(pathStr.c_str());
+        if (embeddedTex)
+        {
+            if (embeddedTex->mHeight == 0)
+            {
+                // 압축 포맷 (PNG, JPG 등): mWidth가 파일 바이트 수
+                loadedTexture = textureLoader->LoadTextureFromMemory(embeddedTex->pcData, embeddedTex->mWidth);
+            }
+            else
+            {
+                // 비압축 ARGB8888/RGBA 포맷: aiTexel (b, g, r, a) -> RGBA 변환
+                std::vector<BYTE> rgba(embeddedTex->mWidth * embeddedTex->mHeight * 4);
+                const aiTexel* src = embeddedTex->pcData;
+                for (size_t p = 0; p < embeddedTex->mWidth * embeddedTex->mHeight; ++p)
+                {
+                    rgba[p * 4 + 0] = src[p].r;
+                    rgba[p * 4 + 1] = src[p].g;
+                    rgba[p * 4 + 2] = src[p].b;
+                    rgba[p * 4 + 3] = src[p].a;
+                }
+                loadedTexture = textureLoader->CreateTextureFromRawRGBA(rgba.data(), embeddedTex->mWidth, embeddedTex->mHeight);
+            }
+        }
+        else
+        {
+            // 2) 외부 파일 경로: 모델 경로 기준 상대 경로 해석
+            namespace fs = std::filesystem;
+            fs::path modelDir = fs::path(modelPath).parent_path();
+            fs::path resolvedPath = modelDir / pathStr;
+
+            if (!fs::exists(resolvedPath))
+            {
+                resolvedPath = modelDir / fs::path(pathStr).filename();
+            }
+
+            if (fs::exists(resolvedPath))
+            {
+                loadedTexture = textureLoader->LoadTextureFromFile(resolvedPath.wstring());
+            }
+        }
+
+        if (loadedTexture)
+        {
+            textureCache[pathStr] = loadedTexture;
+        }
+        return loadedTexture;
+    };
+
+    for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
+    {
+        const aiMaterial* aiMat = scene->mMaterials[i];
+        auto mat = std::make_shared<Material>();
+
+        // 1. Base Color (Albedo) Factor
+        aiColor4D baseColor(1.0f, 1.0f, 1.0f, 1.0f);
+        if (aiMat->Get(AI_MATKEY_BASE_COLOR, baseColor) == AI_SUCCESS ||
+            aiMat->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == AI_SUCCESS)
+        {
+            mat->SetBaseColor(Vector3(baseColor.r, baseColor.g, baseColor.b));
+        }
+
+        // 2. Metallic Factor
+        float metallic = 0.0f;
+        if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS)
+        {
+            mat->SetMetallic(std::clamp(metallic, 0.0f, 1.0f));
+        }
+
+        // 3. Roughness Factor
+        float roughness = 0.5f;
+        if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS)
+        {
+            mat->SetRoughness(std::clamp(roughness, 0.04f, 1.0f));
+        }
+
+        // 4. Base Color Texture (glTF BASE_COLOR or OBJ/FBX DIFFUSE)
+        aiString texPath;
+        if (aiMat->GetTexture(aiTextureType_BASE_COLOR, 0, &texPath) == AI_SUCCESS ||
+            aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS)
+        {
+            auto tex = LoadTextureFromAssimp(texPath);
+            if (tex)
+            {
+                mat->SetBaseColorTexture(tex);
+            }
+        }
+
+        // 5. Normal Texture (glTF NORMALS or OBJ/FBX HEIGHT)
+        aiString normalPath;
+        if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &normalPath) == AI_SUCCESS ||
+            aiMat->GetTexture(aiTextureType_HEIGHT, 0, &normalPath) == AI_SUCCESS)
+        {
+            auto normTex = LoadTextureFromAssimp(normalPath);
+            if (normTex)
+            {
+                mat->SetNormalTexture(normTex);
+            }
+        }
+
+        materials.push_back(mat);
+    }
+
+    return materials;
+}
+
 //LoadStaticMesh
 std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(
     ID3D12Device* device,
     UploadContext* uploadContext,
-    const std::string& path)
+    const std::string& path,
+    std::vector<std::shared_ptr<Material>>* outMaterials,
+    TextureLoader* textureLoader)
 {
+    if (outMaterials) outMaterials->clear();
     std::string validPath = ResolveValidPath(path);
     if (validPath.empty()) return nullptr;
 
@@ -142,30 +310,31 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(
         aiProcess_JoinIdenticalVertices |
         aiProcess_ConvertToLeftHanded;
 
-    const aiScene* scene = nullptr;
-    try
+    const aiScene* scene = importer.ReadFile(validPath, flags);
+    if (!scene || !scene->mRootNode || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE))
     {
-        scene = importer.ReadFile(validPath, flags);
-    }
-    catch (...)
-    {
+        OutputDebugStringA("[ModelLoader] Failed to load static mesh: ");
+        OutputDebugStringA(importer.GetErrorString());
+        OutputDebugStringA("\n");
         return nullptr;
     }
 
-    if (!scene || !scene->mRootNode || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE))
+    if (outMaterials)
     {
-        return nullptr;
+        *outMaterials = LoadMaterials(scene, validPath, textureLoader);
     }
 
     std::vector<Vertex> vertices;
     std::vector<UINT32> indices;
     std::vector<UINT32> meshOffsets;
-    ExtractGeometry(scene, vertices, indices, meshOffsets);
+    std::vector<SubMesh> subMeshes;
+    ExtractGeometry(scene, vertices, indices, meshOffsets, subMeshes);
 
     if (vertices.empty() || indices.empty()) return nullptr;
 
     auto result = std::make_shared<Mesh>();
     result->Create(device, uploadContext, vertices, indices);
+    result->SetSubMeshes(std::move(subMeshes));
     result->SetBoundingBox(CalculateBounds(vertices));
 
     return result;
@@ -176,9 +345,12 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
     ID3D12Device* device,
     UploadContext* uploadContext,
     const std::string& path,
-    std::vector<std::shared_ptr<Animation>>* outAnimations)
+    std::vector<std::shared_ptr<Animation>>* outAnimations,
+    std::vector<std::shared_ptr<Material>>* outMaterials,
+    TextureLoader* textureLoader)
 {
     if (outAnimations) outAnimations->clear();
+    if (outMaterials) outMaterials->clear();
 
     std::string validPath = ResolveValidPath(path);
     if (validPath.empty()) return nullptr;
@@ -191,19 +363,18 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         aiProcess_LimitBoneWeights |
         aiProcess_ConvertToLeftHanded;
 
-    const aiScene* scene = nullptr;
-    try
+    const aiScene* scene = importer.ReadFile(validPath, flags);
+    if (!scene || !scene->mRootNode || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE))
     {
-        scene = importer.ReadFile(validPath, flags);
-    }
-    catch (...)
-    {
+        OutputDebugStringA("[ModelLoader] Failed to load skinned mesh: ");
+        OutputDebugStringA(importer.GetErrorString());
+        OutputDebugStringA("\n");
         return nullptr;
     }
 
-    if (!scene || !scene->mRootNode || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE))
+    if (outMaterials)
     {
-        return nullptr;
+        *outMaterials = LoadMaterials(scene, validPath, textureLoader);
     }
 
     //버텍스에 영향을 주는 실제 본 개수 확인
@@ -222,7 +393,8 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
     std::vector<Vertex> vertices;
     std::vector<UINT32> indices;
     std::vector<UINT32> meshOffsets;
-    ExtractGeometry(scene, vertices, indices, meshOffsets);
+    std::vector<SubMesh> subMeshes;
+    ExtractGeometry(scene, vertices, indices, meshOffsets, subMeshes);
 
     if (vertices.empty() || indices.empty()) return nullptr;
 
@@ -383,6 +555,7 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
 
     auto result = std::make_shared<SkinnedMesh>();
     result->Create(device, uploadContext, vertices, indices);
+    result->SetSubMeshes(std::move(subMeshes));
     result->SetSkeleton(skeleton);
     result->SetBoundingBox(CalculateBounds(vertices));
 

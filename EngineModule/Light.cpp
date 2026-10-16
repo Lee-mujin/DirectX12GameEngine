@@ -6,7 +6,7 @@
 #include "SpotLight.h"
 #include "imgui.h"
 
-void Light::Draw(Scene& scene)
+void LightPanel::Draw(Scene& scene)
 {
     ImGui::Begin("Lights");
 

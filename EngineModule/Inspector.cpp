@@ -84,8 +84,39 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
 
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
         {
+            size_t matCount = meshRenderer->GetMaterialInstanceCount();
+            static int selectedSlot = 0;
+            if (matCount > 1)
+            {
+                if (selectedSlot >= static_cast<int>(matCount)) selectedSlot = 0;
+
+                std::string currentSlotLabel = "Material Slot [" + std::to_string(selectedSlot) + "]";
+                if (ImGui::BeginCombo("Slot", currentSlotLabel.c_str()))
+                {
+                    for (int s = 0; s < static_cast<int>(matCount); ++s)
+                    {
+                        bool isSelected = (selectedSlot == s);
+                        std::string label = "Material Slot [" + std::to_string(s) + "]";
+                        if (ImGui::Selectable(label.c_str(), isSelected))
+                        {
+                            selectedSlot = s;
+                        }
+                        if (isSelected)
+                        {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::Separator();
+            }
+            else
+            {
+                selectedSlot = 0;
+            }
+
             //MaterialInstance 참조 획득
-            MaterialInstance& matInst = meshRenderer->GetMaterialInstance();
+            MaterialInstance& matInst = meshRenderer->GetMaterialInstance(selectedSlot);
             std::shared_ptr<Material> parentMat = matInst.GetParent();
 
             Vector3 baseColor = matInst.GetBaseColor();
@@ -94,16 +125,16 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
                 matInst.SetBaseColor(baseColor);
             }
 
-            float metallic = parentMat ? parentMat->GetMetallic() : 0.0f;
+            float metallic = matInst.GetMetallic();
             if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f))
             {
-                if (parentMat) parentMat->SetMetallic(metallic);
+                matInst.SetMetallic(metallic);
             }
 
-            float roughness = parentMat ? parentMat->GetRoughness() : 0.5f;
+            float roughness = matInst.GetRoughness();
             if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f))
             {
-                if (parentMat) parentMat->SetRoughness(roughness);
+                matInst.SetRoughness(roughness);
             }
 
             float shininess = matInst.GetShininess();

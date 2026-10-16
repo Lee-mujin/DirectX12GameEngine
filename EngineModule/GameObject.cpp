@@ -13,22 +13,6 @@ void GameObject::Update(float deltaTime)
     }
 }
 
-void GameObject::Render(D3D12Renderer& renderer)
-{
-    for (auto& c : mComponents)
-    {
-        c->Render(renderer);
-    }
-}
-
-void GameObject::RenderShadow(D3D12Renderer& renderer)
-{
-    for (auto& c : mComponents)
-    {
-        c->RenderShadow(renderer);
-    }
-}
-
 BoundingBox GameObject::GetWorldBoundingBox() const
 {
     GameObject* nonConstThis = const_cast<GameObject*>(this);

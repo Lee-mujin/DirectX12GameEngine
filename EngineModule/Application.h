@@ -47,7 +47,7 @@ private:
     EditorState mEditorState;
     Hierarchy mHierarchy;
     Inspector mInspector;
-    Light mLight;
+    LightPanel mLightPanel;
     ContentBrowser mContentBrowser;
     Gizmo mGizmoPanel;
     UploadContext mUploadContext;

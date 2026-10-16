@@ -22,9 +22,15 @@ void ModelUtility::ReplaceModel(GameObject& targetObject, std::shared_ptr<Model>
     //Mesh 교체
     mr->SetMesh(model->GetMesh());
 
-    //이전 모델의 Material이 남지 않도록 새 기본 Material 생성 후 할당
-    auto defaultMaterial = std::make_shared<Material>();
-    mr->SetMaterial(defaultMaterial);
+    //이전 모델의 Material이 남지 않도록 로드된 Materials 할당 (없으면 기본 Material 1개 생성)
+    if (!model->GetMaterials().empty())
+    {
+        mr->SetMaterials(model->GetMaterials());
+    }
+    else
+    {
+        mr->SetMaterial(std::make_shared<Material>());
+    }
 
     //Skinned / Static 컴포넌트 동기화
     if (model->IsSkinned())

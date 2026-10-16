@@ -16,6 +16,17 @@
 #include "Vector3.h"
 #include "RenderItem.h"
 #include "RenderQueue.h"
+#include "ToneMappingPass.h"
+#include "BrightPass.h"
+#include "GaussianBlurPass.h"
+
+enum class ViewportDisplayMode : int
+{
+    FinalLDR = 0,
+    BrightPass = 1,
+    BloomBlur = 2,
+    HDRRaw = 3
+};
 
 using Microsoft::WRL::ComPtr;
 
@@ -62,12 +73,7 @@ public:
     ID3D12DescriptorHeap* GetSrvHeap() const { return mSrvAllocator.GetHeap(); }
 
     void BeginFrame(const Camera& camera, const DirectionalLight& dirLight, const PointLight& pointLight, const SpotLight& spotLight);
-    void DrawMesh(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix);
-    void DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
-
-    // RenderItem 기반 드로우 함수 추가
     void DrawRenderItem(const RenderItem& item);
-
     void EndFrame();
 
     void SetImGuiLayer(ImGuiLayer* layer) { mImGuiLayer = layer; }
@@ -79,17 +85,45 @@ public:
 
     void InitializeViewport(UINT width, UINT height);
     void ResizeViewport(UINT width, UINT height);
-    D3D12_GPU_DESCRIPTOR_HANDLE GetViewportSrvHandle() const { return mViewportTarget.GetSrvHandle(); }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetViewportSrvHandle() const;
+    DXGI_FORMAT GetViewportFormat() const { return mViewportFormat; }
+    void SetViewportFormat(DXGI_FORMAT format) { mViewportFormat = format; }
+
+    //HDR 렌더 타깃 접근자
+    const RenderTarget& GetHDRRenderTarget() const { return mHDRRenderTarget; }
+    RenderTarget& GetHDRRenderTarget() { return mHDRRenderTarget; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetHDRSrvHandle() const { return mHDRRenderTarget.GetSrvHandle(); }
+    DXGI_FORMAT GetHDRFormat() const { return mHDRFormat; }
 
     void TransitionToSwapChain();
+    void ExecuteBrightPass();
+    void ExecuteGaussianBlur();
+    void ExecuteToneMappingPass();
+
+    BrightPassCBData& GetBrightPassParams() { return mBrightPassParams; }
+    const BrightPassCBData& GetBrightPassParams() const { return mBrightPassParams; }
+    void SetBrightPassParams(const BrightPassCBData& params) { mBrightPassParams = params; }
+
+    int GetBlurIterations() const { return mBlurIterations; }
+    void SetBlurIterations(int iter) { mBlurIterations = std::clamp(iter, 1, 4); }
+
+    float GetBlurSigma() const { return mBlurSigma; }
+    void SetBlurSigma(float sigma) { mBlurSigma = std::clamp(sigma, 0.1f, 5.0f); }
+
+    ViewportDisplayMode GetViewportDisplayMode() const { return mDisplayMode; }
+    void SetViewportDisplayMode(ViewportDisplayMode mode) { mDisplayMode = mode; }
+
+    ToneMappingCBData& GetToneMappingParams() { return mToneMappingParams; }
+    const ToneMappingCBData& GetToneMappingParams() const { return mToneMappingParams; }
+    void SetToneMappingParams(const ToneMappingCBData& params) { mToneMappingParams = params; }
     void SetDefaultWhiteTexture(std::shared_ptr<Texture> texture) { mDefaultWhiteTexture = texture; }
 
     bool InitializeShadowMap(); //Initialize() 안에서 호출
 
     //CSM Cascade Index 지원을 위해 cascadeIndex = 0 매개변수 추가
     void BeginShadowPass(const DirectionalLight& light, const Camera& camera, UINT cascadeIndex = 0);
-    void DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix);
-    void DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices);
+    void DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix, UINT indexCount = 0, UINT indexStart = 0, INT baseVertexLocation = 0);
+    void DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices, UINT indexCount = 0, UINT indexStart = 0, INT baseVertexLocation = 0);
     void EndShadowPass();
 
     void Render(const RenderQueue& renderQueue);
@@ -108,18 +142,11 @@ private:
 
     void CompileShaderInternal(const std::wstring& filename, const char* entryPoint, const char* target, ID3DBlob** shaderBlob);
 
-    // DrawMeshInternal 서브루틴 분리 함수 선언
-    void BindMaterial(const Material& material, bool hasNormalMap);
-    void UploadObjectCB(const Material& material, const Matrix4x4& worldMatrix, bool hasNormalMap);
-    void UploadBoneCB(const BoneCBData* boneData);
-    void DrawGeometry(const Mesh& mesh);
-
-    // RenderItem 전용 서브루틴 선언
+    // 지오메트리 DrawCall 및 RenderItem 서브루틴 선언
+    void DrawGeometry(const Mesh& mesh, UINT indexCount = 0, UINT indexStart = 0, INT baseVertexLocation = 0);
     void BindItemTextures(const RenderItem& item);
     void UploadObjectCB(const RenderItem& item);
     void UploadBoneCB(const std::vector<Matrix4x4>* boneMatrices);
-
-    void DrawMeshInternal(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const BoneCBData* boneData, ID3D12PipelineState* pso);
 
     void SyncFrameViaRingBuffer(FrameResource& fr);
     void ResetCommandSession(FrameResource& fr);
@@ -193,7 +220,6 @@ private:
 
     RenderTarget mViewportTarget;
     D3D12_CPU_DESCRIPTOR_HANDLE mViewportRtvHandle{};
-    D3D12_CPU_DESCRIPTOR_HANDLE mViewportDsvHandle{};
     D3D12_CPU_DESCRIPTOR_HANDLE mViewportSrvCpuHandle = { 0 };
     D3D12_GPU_DESCRIPTOR_HANDLE mViewportSrvGpuHandle = { 0 };
     bool mIsViewportSrvAllocated = false;
@@ -215,4 +241,41 @@ private:
     Vector3 mCascadeSplits;
 
     float mClearColor[4] = { 0.0f, 0.2f, 0.6f, 1.0f };
+    DXGI_FORMAT mViewportFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+    //HDR 렌더 타깃 (R16G16B16A16_FLOAT)
+    RenderTarget mHDRRenderTarget;
+    DXGI_FORMAT mHDRFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    D3D12_CPU_DESCRIPTOR_HANDLE mHDRRtvHandle{};
+    D3D12_CPU_DESCRIPTOR_HANDLE mHDRDsvHandle{};
+    D3D12_CPU_DESCRIPTOR_HANDLE mHDRSrvCpuHandle = { 0 };
+    D3D12_GPU_DESCRIPTOR_HANDLE mHDRSrvGpuHandle = { 0 };
+    bool mIsHDRSrvAllocated = false;
+
+    void InitializeHDRRenderTarget(UINT width, UINT height);
+    ToneMappingPass mToneMappingPass;
+    ToneMappingCBData mToneMappingParams;
+
+    // Bloom Ping-Pong RenderTargets (1/2 Resolution, R16G16B16A16_FLOAT)
+    RenderTarget mBloomTargetA;
+    RenderTarget mBloomTargetB;
+    D3D12_CPU_DESCRIPTOR_HANDLE mBloomARtvHandle{};
+    D3D12_CPU_DESCRIPTOR_HANDLE mBloomASrvCpuHandle = { 0 };
+    D3D12_GPU_DESCRIPTOR_HANDLE mBloomASrvGpuHandle = { 0 };
+    bool mIsBloomASrvAllocated = false;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE mBloomBRtvHandle{};
+    D3D12_CPU_DESCRIPTOR_HANDLE mBloomBSrvCpuHandle = { 0 };
+    D3D12_GPU_DESCRIPTOR_HANDLE mBloomBSrvGpuHandle = { 0 };
+    bool mIsBloomBSrvAllocated = false;
+
+    void InitializeBloomRenderTargets(UINT width, UINT height);
+    BrightPass mBrightPass;
+    BrightPassCBData mBrightPassParams;
+
+    GaussianBlurPass mGaussianBlurPass;
+    int mBlurIterations = 1;
+    float mBlurSigma = 1.0f;
+
+    ViewportDisplayMode mDisplayMode = ViewportDisplayMode::FinalLDR;
 };

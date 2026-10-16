@@ -167,6 +167,8 @@
     <ClInclude Include="AssetHandle.h" />
     <ClInclude Include="BoundingBox.h" />
     <ClInclude Include="BoundingSphere.h" />
+    <ClInclude Include="BrightPass.h" />
+    <ClInclude Include="GaussianBlurPass.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="Component.h" />
@@ -219,6 +221,7 @@
     <ClInclude Include="Texture.h" />
     <ClInclude Include="TextureLoader.h" />
     <ClInclude Include="Timer.h" />
+    <ClInclude Include="ToneMappingPass.h" />
     <ClInclude Include="UIPass.h" />
     <ClInclude Include="UploadContext.h" />
     <ClInclude Include="Vertex.h" />
@@ -258,6 +261,8 @@
     <ClCompile Include="AssetHandle.cpp" />
     <ClCompile Include="BoundingBox.cpp" />
     <ClCompile Include="BoundingSphere.cpp" />
+    <ClCompile Include="BrightPass.cpp" />
+    <ClCompile Include="GaussianBlurPass.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraComponent.cpp" />
     <ClCompile Include="CgltfImpl.cpp">
@@ -303,6 +308,7 @@
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureLoader.cpp" />
     <ClCompile Include="Timer.cpp" />
+    <ClCompile Include="ToneMappingPass.cpp" />
     <ClCompile Include="UIPass.cpp" />
     <ClCompile Include="UploadContext.cpp" />
     <ClCompile Include="Viewport.cpp" />

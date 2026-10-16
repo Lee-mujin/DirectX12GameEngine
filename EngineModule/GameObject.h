@@ -9,8 +9,6 @@
 #include "AssetHandle.h"
 #include "BoundingBox.h"
 
-class D3D12Renderer;
-
 class GameObject : public std::enable_shared_from_this<GameObject>
 {
 public:
@@ -18,8 +16,6 @@ public:
     virtual ~GameObject() = default;
 
     virtual void Update(float deltaTime);
-    virtual void Render(D3D12Renderer& renderer);
-    virtual void RenderShadow(D3D12Renderer& renderer);
     //컴포넌트 중복 생성 방지: 이미 존재하면 기존 포인터 반환
     template<typename T, typename... Args>
     T* AddComponent(Args&&... args)

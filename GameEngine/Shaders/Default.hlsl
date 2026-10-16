@@ -3,8 +3,10 @@ cbuffer ObjectCB : register(b0)
     matrix gWorld;
     float3 gMaterialColor;
     float gShininess;
+    float gMetallic;
+    float gRoughness;
     int gHasNormalMap;
-    float3 gObjectPad0;
+    float gObjectPad0;
 };
 
 cbuffer CameraCB : register(b1)
@@ -275,83 +277,137 @@ float CalculateCSMShadowFactor(float3 worldPos, float3 normalWS, float3 lightDir
     return percentLit / 25.0f;
 }
 
-float3 CalcDirLight(float3 worldPos, float3 normal, float3 viewDir)
+static const float PI = 3.14159265359f;
+
+// 1. Trowbridge-Reitz GGX Normal Distribution Function (NDF)
+float DistributionGGX(float3 N, float3 H, float roughness)
 {
-    float3 lightDir = normalize(-gDirLightDirection);
-    float NdotL = saturate(dot(normal, lightDir));
-    float3 diffuse = gDirLightColor * gDirLightIntensity * NdotL;
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0f);
+    float NdotH2 = NdotH * NdotH;
 
-    float3 halfDir = normalize(lightDir + viewDir);
-    float NdotH = saturate(dot(normal, halfDir));
-    float3 specular = gDirLightColor * pow(NdotH, gShininess) * NdotL;
+    float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
+    denom = PI * denom * denom;
 
-    // Bias가 적용된 Shadow Factor 계산 (Directional Light - CSM 적용)
-    float shadowFactor = CalculateCSMShadowFactor(worldPos, normal, lightDir);
-
-    // Ambient 처리: 직사광(Diffuse + Specular)에만 shadowFactor 곱하기
-    return (diffuse + specular * 0.3f) * shadowFactor;
+    return a2 / max(denom, 0.0000001f);
 }
 
-float3 CalcPointLight(float3 worldPos, float3 normal, float3 viewDir)
+// 2. Schlick-GGX Geometric Shadowing Function
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0f);
+    float k = (r * r) / 8.0f;
+
+    float denom = NdotV * (1.0f - k) + k;
+    return NdotV / max(denom, 0.0000001f);
+}
+
+// Smith Model for Geometry Shadowing
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0f);
+    float NdotL = max(dot(N, L), 0.0f);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+// 3. Fresnel-Schlick Approximation
+float3 FresnelSchlick(float cosTheta, float3 F0)
+{
+    return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
+}
+
+// Cook-Torrance Specular + Lambertian Diffuse BRDF Evaluator
+float3 EvaluatePBR(float3 N, float3 V, float3 L, float3 radiance, float3 albedo, float metallic, float roughness, float3 F0)
+{
+    float NdotL = max(dot(N, L), 0.0f);
+    float NdotV = max(dot(N, V), 0.0f);
+
+    if (NdotL <= 0.0f || NdotV <= 0.0f)
+    {
+        return float3(0.0f, 0.0f, 0.0f);
+    }
+
+    float3 H = normalize(V + L);
+
+    // Cook-Torrance Specular BRDF
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    float3 F = FresnelSchlick(max(dot(H, V), 0.0f), F0);
+
+    float3 numerator = NDF * G * F;
+    float denominator = 4.0f * NdotV * NdotL + 0.0001f;
+    float3 specular = numerator / denominator;
+
+    // Energy conservation: kD (diffuse) + kS (specular) = 1
+    float3 kS = F;
+    float3 kD = (float3(1.0f, 1.0f, 1.0f) - kS) * (1.0f - metallic);
+
+    // Outgoing radiance
+    return (kD * albedo / PI + specular) * radiance * NdotL;
+}
+
+float3 CalcDirLight(float3 worldPos, float3 N, float3 V, float3 albedo, float metallic, float roughness, float3 F0)
+{
+    float3 L = normalize(-gDirLightDirection);
+    float3 radiance = gDirLightColor * gDirLightIntensity;
+
+    float shadowFactor = CalculateCSMShadowFactor(worldPos, N, L);
+
+    return EvaluatePBR(N, V, L, radiance, albedo, metallic, roughness, F0) * shadowFactor;
+}
+
+float3 CalcPointLight(float3 worldPos, float3 N, float3 V, float3 albedo, float metallic, float roughness, float3 F0)
 {
     if (gPointLightEnabled == 0)
     {
-        return float3(0, 0, 0);
+        return float3(0.0f, 0.0f, 0.0f);
     }
 
     float3 toLight = gPointLightPosition - worldPos;
     float distance = length(toLight);
-    float3 lightDir = toLight / max(distance, 0.0001f);
+    float3 L = toLight / max(distance, 0.0001f);
 
     float attenuation = saturate(1.0f - (distance * distance) / (gPointLightRange * gPointLightRange));
     attenuation *= attenuation;
 
-    float NdotL = saturate(dot(normal, lightDir));
-    float3 diffuse = gPointLightColor * gPointLightIntensity * NdotL;
+    float3 radiance = gPointLightColor * gPointLightIntensity * attenuation;
 
-    float3 halfDir = normalize(lightDir + viewDir);
-    float NdotH = saturate(dot(normal, halfDir));
-    float3 specular = gPointLightColor * pow(NdotH, gShininess) * NdotL;
-
-    return (diffuse + specular * 0.3f) * attenuation;
+    return EvaluatePBR(N, V, L, radiance, albedo, metallic, roughness, F0);
 }
 
-// Spot Light용 spotShadowPosH 매개변수 추가 및 섀도우 맵 적용
-float3 CalcSpotLight(float3 worldPos, float3 normal, float3 viewDir, float4 spotShadowPosH)
+float3 CalcSpotLight(float3 worldPos, float3 N, float3 V, float4 spotShadowPosH, float3 albedo, float metallic, float roughness, float3 F0)
 {
     if (gSpotLightEnabled == 0)
     {
-        return float3(0, 0, 0);
+        return float3(0.0f, 0.0f, 0.0f);
     }
 
     float3 toLight = gSpotLightPosition - worldPos;
     float distance = length(toLight);
-    float3 lightDir = toLight / max(distance, 0.0001f);
+    float3 L = toLight / max(distance, 0.0001f);
 
     float3 spotForward = normalize(-gSpotLightDirection);
-    float cosAngle = dot(lightDir, spotForward);
+    float cosAngle = dot(L, spotForward);
 
     float spotFactor = saturate((cosAngle - gSpotLightOuterCos) / max(gSpotLightInnerCos - gSpotLightOuterCos, 0.0001f));
-
     if (spotFactor <= 0.0f)
     {
-        return float3(0, 0, 0);
+        return float3(0.0f, 0.0f, 0.0f);
     }
 
     float attenuation = saturate(1.0f - (distance * distance) / (gSpotLightRange * gSpotLightRange));
     attenuation *= attenuation;
 
-    float NdotL = saturate(dot(normal, lightDir));
-    float3 diffuse = gSpotLightColor * gSpotLightIntensity * NdotL;
+    float3 radiance = gSpotLightColor * gSpotLightIntensity * attenuation * spotFactor;
 
-    float3 halfDir = normalize(lightDir + viewDir);
-    float NdotH = saturate(dot(normal, halfDir));
-    float3 specular = gSpotLightColor * pow(NdotH, gShininess) * NdotL;
+    // Spot Light는 전용 섀도우 맵 패스 추가 시 shadowFactor 연동 가능
+    float shadowFactor = 1.0f;
 
-    // Spot Light에도 섀도우 연산 적용
-    float shadowFactor = CalculateShadowFactor(spotShadowPosH, normal, lightDir);
-
-    return (diffuse + specular * 0.3f) * attenuation * spotFactor * shadowFactor;
+    return EvaluatePBR(N, V, L, radiance, albedo, metallic, roughness, F0) * shadowFactor;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
@@ -373,17 +429,25 @@ float4 PSMain(PSInput input) : SV_TARGET
         N = normalize(mul(tangentNormal, TBN));
     }
 
-    float3 viewDir = normalize(gCameraPos - input.worldPos);
+    float3 V = normalize(gCameraPos - input.worldPos);
 
-    // 기본 환경광(Ambient) 0.15 추가하여 완전 검은색 방지
-    float3 ambient = float3(0.15f, 0.15f, 0.15f);
+    // PBR 머티리얼 파라미터 유효 범위 보정
+    float roughness = clamp(gRoughness, 0.05f, 1.0f);
+    float metallic = saturate(gMetallic);
+    float3 albedo = baseColor.rgb;
 
-    // CalcDirLight에 input.worldPos를 전달하여 CSM 연산 수행
-    float3 directLighting = CalcDirLight(input.worldPos, N, viewDir)
-        + CalcPointLight(input.worldPos, N, viewDir)
-        + CalcSpotLight(input.worldPos, N, viewDir, input.spotShadowPosH); // Spot Light 좌표 전달
+    // 기본 반사율 F0: 절연체는 0.04, 도체(금속)는 Albedo 색상 사용
+    float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
 
-    float3 finalColor = baseColor.rgb * (ambient + directLighting);
+    // 직사광 PBR 누적 계산
+    float3 Lo = CalcDirLight(input.worldPos, N, V, albedo, metallic, roughness, F0)
+        + CalcPointLight(input.worldPos, N, V, albedo, metallic, roughness, F0)
+        + CalcSpotLight(input.worldPos, N, V, input.spotShadowPosH, albedo, metallic, roughness, F0);
+
+    // 기본 환경광 (IBL 도입 전까지 완전 암전 방지용 보조광)
+    float3 ambient = float3(0.04f, 0.04f, 0.04f) * albedo;
+
+    float3 finalColor = ambient + Lo;
 
     return float4(finalColor, baseColor.a);
 }

@@ -4,7 +4,6 @@
 
 class GameObject;
 class Model;
-class ResourceManager;
 
 class ModelUtility
 {

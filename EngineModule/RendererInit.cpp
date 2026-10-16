@@ -35,9 +35,9 @@ void D3D12Renderer::InitializeFrameResources()
 //디스크립터 할당자 Heap 초기화
 void D3D12Renderer::InitializeDescriptors()
 {
-    //Allocator 안전 초기화 (DSV Heap 개수를 8개로 늘려 슬롯 겹침 방지)
+    //Allocator 안전 초기화 (DSV Heap 8개, RTV Heap 16개로 늘려 HDR 및 블룸 핑퐁 타깃 슬롯 확보)
     mSrvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSrvCount, true);
-    mRtvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kFrameCount + 1, false);
+    mRtvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 16, false); //16개로 확장
     mDsvAllocator.Initialize(mDevice.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 8, false); //8개로 확장
 }
 
@@ -53,6 +53,8 @@ void D3D12Renderer::InitializeRenderTargets()
 
     SetupViewport();
     InitializeViewport(1280, 720);
+    InitializeHDRRenderTarget(1280, 720);
+    InitializeBloomRenderTargets(1280, 720);
 }
 
 //파이프라인(셰이더, 루트시그니처, PSO) 구축
@@ -61,6 +63,9 @@ void D3D12Renderer::InitializePipeline()
     CreateShader();
     CreateRootSignature();
     CreatePSOs();
+    mToneMappingPass.Initialize(mDevice.Get(), mViewportFormat);
+    mBrightPass.Initialize(mDevice.Get(), mHDRFormat);
+    mGaussianBlurPass.Initialize(mDevice.Get(), mHDRFormat);
 }
 
 bool D3D12Renderer::InitializeShadowMap()
@@ -299,7 +304,7 @@ void D3D12Renderer::CreatePipelineState(ID3DBlob* vsBlob, ID3DBlob* psBlob, ID3D
     else
     {
         psoDesc.NumRenderTargets = 1;
-        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        psoDesc.RTVFormats[0] = mHDRFormat;
     }
 
     psoDesc.DSVFormat = dsvFormat;

@@ -5,12 +5,16 @@ void RenderTarget::Create(ID3D12Device* device, UINT width, UINT height,
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle,
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle,
     D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
-    D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle)
+    D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle,
+    DXGI_FORMAT colorFormat,
+    bool useDepth)
 {
     mRtvHandle = rtvHandle;
     mDsvHandle = dsvHandle;
     mSrvCpuHandle = srvCpuHandle;
     mSrvGpuHandle = srvGpuHandle;
+    mColorFormat = colorFormat;
+    mUseDepth = useDepth;
 
     CreateResources(device, width, height);
 }
@@ -26,12 +30,12 @@ void RenderTarget::CreateResources(ID3D12Device* device, UINT width, UINT height
     colorDesc.Height = height;
     colorDesc.DepthOrArraySize = 1;
     colorDesc.MipLevels = 1;
-    colorDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    colorDesc.Format = mColorFormat;
     colorDesc.SampleDesc.Count = 1;
     colorDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
     D3D12_CLEAR_VALUE colorClear = {};
-    colorClear.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    colorClear.Format = mColorFormat;
     memcpy(colorClear.Color, mClearColor, sizeof(mClearColor));
 
     CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
@@ -43,11 +47,16 @@ void RenderTarget::CreateResources(ID3D12Device* device, UINT width, UINT height
     device->CreateRenderTargetView(mColorTexture.Get(), nullptr, mRtvHandle);
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.Format = mColorFormat;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Texture2D.MipLevels = 1;
     device->CreateShaderResourceView(mColorTexture.Get(), &srvDesc, mSrvCpuHandle);
+
+    if (!mUseDepth || mDsvHandle.ptr == 0)
+    {
+        return;
+    }
 
     D3D12_RESOURCE_DESC depthDesc = {};
     depthDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;

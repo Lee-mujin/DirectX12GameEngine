@@ -10,6 +10,15 @@ using Microsoft::WRL::ComPtr;
 
 class UploadContext;
 
+struct SubMesh
+{
+    UINT IndexStart = 0;          // StartIndexLocation
+    UINT IndexCount = 0;          // IndexCountPerInstance
+    INT BaseVertexLocation = 0;   // BaseVertexLocation
+    UINT MaterialIndex = 0;       // Model 머티리얼 인덱스
+    BoundingBox Bounds;           // 서브메시 단위 바운딩 박스
+};
+
 class Mesh
 {
 public:
@@ -28,6 +37,10 @@ public:
     const BoundingBox& GetBoundingBox() const { return mBoundingBox; }
     void SetBoundingBox(const BoundingBox& box) { mBoundingBox = box; }
 
+    //서브메시 접근자
+    const std::vector<SubMesh>& GetSubMeshes() const { return mSubMeshes; }
+    void SetSubMeshes(std::vector<SubMesh> subMeshes) { mSubMeshes = std::move(subMeshes); }
+
 private:
     ComPtr<ID3D12Resource> mVertexBuffer;
     ComPtr<ID3D12Resource> mIndexBuffer;
@@ -42,4 +55,5 @@ private:
     D3D12_RESOURCE_STATES mState = D3D12_RESOURCE_STATE_COMMON;
 
     BoundingBox mBoundingBox;
+    std::vector<SubMesh> mSubMeshes;
 };

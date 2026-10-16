@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "CameraComponent.h"
 
 void CameraComponent::Initialize(float aspect)
 {

@@ -121,19 +121,22 @@ std::shared_ptr<Model> ResourceManager::GetOrLoadModel(AssetHandle handle)
     model->SetHandle(handle);
 
     // 스킨드 메시 우선 시도 후 실패 시 정적 메시 폴백
+    std::vector<std::shared_ptr<Material>> materials;
     std::vector<std::shared_ptr<Animation>> animations;
-    auto skinnedMesh = ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), mUploadContext, path, &animations);
+    auto skinnedMesh = ModelLoader::LoadSkinnedMesh(mRenderer->GetDevice(), mUploadContext, path, &animations, &materials, mTextureLoader);
 
     if (skinnedMesh)
     {
         model->SetSkinnedMesh(skinnedMesh);
         model->SetAnimations(std::move(animations));
+        model->SetMaterials(std::move(materials));
     }
     else
     {
-        auto staticMesh = ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), mUploadContext, path);
+        auto staticMesh = ModelLoader::LoadStaticMesh(mRenderer->GetDevice(), mUploadContext, path, &materials, mTextureLoader);
         if (!staticMesh) return nullptr;
         model->SetStaticMesh(staticMesh);
+        model->SetMaterials(std::move(materials));
     }
 
     mModelCache[handle.GetId()] = model;

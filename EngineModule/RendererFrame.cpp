@@ -69,19 +69,21 @@ void D3D12Renderer::ResetCommandSession(FrameResource& fr)
 //파이프라인 상태(PSO, RootSignature)를 바인딩해 삼각형을 그릴 준비
 void D3D12Renderer::ConfigureViewportRenderTarget()
 {
-    D3D12_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(mViewportTarget.GetWidth()), static_cast<float>(mViewportTarget.GetHeight()), 0.0f, 1.0f };
-    D3D12_RECT scissor = { 0, 0, static_cast<LONG>(mViewportTarget.GetWidth()), static_cast<LONG>(mViewportTarget.GetHeight()) };
+    RenderTarget& target = (mHDRRenderTarget.GetColorResource() != nullptr) ? mHDRRenderTarget : mViewportTarget;
+
+    D3D12_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(target.GetWidth()), static_cast<float>(target.GetHeight()), 0.0f, 1.0f };
+    D3D12_RECT scissor = { 0, 0, static_cast<LONG>(target.GetWidth()), static_cast<LONG>(target.GetHeight()) };
 
     mCommandList->RSSetViewports(1, &vp);
     mCommandList->RSSetScissorRects(1, &scissor);
 
-    //뷰포트 텍스처를 셰이더 읽기용에서 렌더타겟으로 용도 변경
-    TransitionResource(mViewportTarget.GetColorResource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    //HDR 렌더 타깃 텍스처를 셰이더 읽기용에서 렌더타겟으로 용도 변경
+    TransitionResource(target.GetColorResource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = mViewportTarget.GetRtvHandle();
-    D3D12_CPU_DESCRIPTOR_HANDLE dsv = mViewportTarget.GetDsvHandle();
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = target.GetRtvHandle();
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = target.GetDsvHandle();
 
-    //Output Merger 단계에 RTV(색상) 및 DSV(깊이) 타겟 설정
+    //Output Merger 단계에 RTV(색상: R16G16B16A16_FLOAT) 및 DSV(깊이) 타겟 설정
     mCommandList->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
     mCommandList->ClearRenderTargetView(rtv, mClearColor, 0, nullptr); //배경색으로 지우기
     mCommandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr); //깊이 초기화

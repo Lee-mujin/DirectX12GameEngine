@@ -12,76 +12,14 @@ using namespace DirectX;
 
 extern XMMATRIX D3D12RendererToXM(const Matrix4x4& m);
 
-//머티리얼 텍스처 및 섀도우 맵 루트 디스크립터 바인딩
-void D3D12Renderer::BindMaterial(const Material& material, bool hasNormalMap)
-{
-    //Base Color Texture 바인딩
-    std::shared_ptr<Texture> baseTexture = material.GetTexture();
-    if (!baseTexture) baseTexture = mDefaultWhiteTexture;
-
-    if (baseTexture)
-    {
-        const_cast<Texture&>(*baseTexture).TransitionToRenderState(mCommandList.Get());
-        mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::BaseTexture), baseTexture->GetSrvHandle());
-    }
-
-    //Normal Map Texture 바인딩
-    std::shared_ptr<Texture> normalTexture = material.GetNormalTexture();
-    if (hasNormalMap && normalTexture)
-    {
-        const_cast<Texture&>(*normalTexture).TransitionToRenderState(mCommandList.Get());
-        mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::NormalTexture), normalTexture->GetSrvHandle());
-    }
-    else if (mDefaultWhiteTexture)
-    {
-        mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::NormalTexture), mDefaultWhiteTexture->GetSrvHandle());
-    }
-
-    //6번 Root Slot에 Shadow Map SRV 바인딩
-    mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::ShadowTexture), mShadowMap.GetSRV());
-}
-
-//오브젝트 상수 버퍼(ObjectCB) 메모리 복사 및 Root CBV 바인딩
-void D3D12Renderer::UploadObjectCB(const Material& material, const Matrix4x4& worldMatrix, bool hasNormalMap)
-{
-    FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
-
-    ObjectCBData objData;
-    XMStoreFloat4x4(&objData.World, XMMatrixTranspose(D3D12RendererToXM(worldMatrix)));
-
-    Vector3 matColor = material.GetBaseColor();
-    objData.MaterialColor = XMFLOAT3(matColor.X, matColor.Y, matColor.Z);
-    objData.Shininess = material.GetShininess();
-    objData.HasNormalMap = hasNormalMap ? 1 : 0;
-
-    UINT8* objDest = fr.objectCBMapped + mObjectDrawIndex * fr.objectCBStride;
-    memcpy(objDest, &objData, sizeof(objData));
-
-    D3D12_GPU_VIRTUAL_ADDRESS objectCBAddress = fr.objectCB->GetGPUVirtualAddress() + mObjectDrawIndex * fr.objectCBStride;
-    mCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(RootSlot::ObjectCB), objectCBAddress);
-}
-
-//스킨드 애니메이션용 보간 행렬(BoneCB) 데이터 업로드
-void D3D12Renderer::UploadBoneCB(const BoneCBData* boneData)
-{
-    if (!boneData) return;
-
-    FrameResource& fr = mFrameResources[mCurrentFrameResourceIndex];
-
-    UINT8* boneDest = fr.boneCBMapped + mObjectDrawIndex * fr.boneCBStride;
-    memcpy(boneDest, boneData, sizeof(BoneCBData));
-
-    D3D12_GPU_VIRTUAL_ADDRESS boneCBAddress = fr.boneCB->GetGPUVirtualAddress() + mObjectDrawIndex * fr.boneCBStride;
-    mCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(RootSlot::BoneCB), boneCBAddress);
-}
-
 //메시 상태 전이 및 인덱스 기반 DrawCall 수행
-void D3D12Renderer::DrawGeometry(const Mesh& mesh)
+void D3D12Renderer::DrawGeometry(const Mesh& mesh, UINT indexCount, UINT indexStart, INT baseVertexLocation)
 {
     const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
     mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
     mCommandList->IASetIndexBuffer(&mesh.GetIndexBufferView());
-    mCommandList->DrawIndexedInstanced(mesh.GetIndexCount(), 1, 0, 0, 0);
+    UINT count = (indexCount > 0) ? indexCount : mesh.GetIndexCount();
+    mCommandList->DrawIndexedInstanced(count, 1, indexStart, baseVertexLocation, 0);
 }
 
 void D3D12Renderer::BindItemTextures(const RenderItem& item)
@@ -116,7 +54,10 @@ void D3D12Renderer::UploadObjectCB(const RenderItem& item)
 
     objData.MaterialColor = XMFLOAT3(item.BaseColor.X, item.BaseColor.Y, item.BaseColor.Z);
     objData.Shininess = item.Shininess;
+    objData.Metallic = item.Metallic;
+    objData.Roughness = item.Roughness;
     objData.HasNormalMap = item.HasNormalMap ? 1 : 0;
+    objData.Pad0 = 0.0f;
 
     UINT8* objDest = fr.objectCBMapped + mObjectDrawIndex * fr.objectCBStride;
     memcpy(objDest, &objData, sizeof(objData));
@@ -160,57 +101,22 @@ void D3D12Renderer::DrawRenderItem(const RenderItem& item)
 
     if (item.IsSkinned())
     {
-        UploadBoneCB(item.BoneMatrices);
+        UploadBoneCB(item.BoneMatrices); //본 행렬 상수 버퍼 업로드
         if (item.SkinnedMeshPtr)
         {
             const_cast<SkinnedMesh*>(item.SkinnedMeshPtr)->TransitionToRenderState(mCommandList.Get());
             mCommandList->IASetVertexBuffers(0, 1, &item.SkinnedMeshPtr->GetVertexBufferView());
             mCommandList->IASetIndexBuffer(&item.SkinnedMeshPtr->GetIndexBufferView());
-            mCommandList->DrawIndexedInstanced(item.SkinnedMeshPtr->GetIndexCount(), 1, 0, 0, 0);
+            UINT count = (item.IndexCount > 0) ? item.IndexCount : item.SkinnedMeshPtr->GetIndexCount();
+            mCommandList->DrawIndexedInstanced(count, 1, item.IndexStart, item.BaseVertexLocation, 0);
         }
     }
     else if (item.MeshPtr)
     {
-        DrawGeometry(*item.MeshPtr);
+        DrawGeometry(*item.MeshPtr, item.IndexCount, item.IndexStart, item.BaseVertexLocation);
     }
 
     mObjectDrawIndex++;
-}
-
-void D3D12Renderer::DrawMeshInternal(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const BoneCBData* boneData, ID3D12PipelineState* pso)
-{
-    if (mObjectDrawIndex >= kMaxObjectsPerFrame) return;
-
-    mCommandList->SetPipelineState(pso);
-
-    bool hasNormalMap = (material.GetNormalTexture() != nullptr);
-
-    BindMaterial(material, hasNormalMap);
-    UploadObjectCB(material, worldMatrix, hasNormalMap);
-    UploadBoneCB(boneData);
-    DrawGeometry(mesh);
-
-    mObjectDrawIndex++;
-}
-
-void D3D12Renderer::DrawMesh(const Mesh& mesh, const Material& material, const Matrix4x4& worldMatrix)
-{
-    DrawMeshInternal(mesh, material, worldMatrix, nullptr, mPSO.Get());
-}
-
-void D3D12Renderer::DrawSkinnedMesh(const SkinnedMesh& mesh, const Material& material, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices)
-{
-    BoneCBData boneData;
-    UINT boneCount = static_cast<UINT>(boneMatrices.size());
-    for (UINT i = 0; i < MAX_BONES; ++i)
-    {
-        if (i < boneCount)
-            XMStoreFloat4x4(&boneData.BoneMatrices[i], XMMatrixTranspose(D3D12RendererToXM(boneMatrices[i])));
-        else
-            XMStoreFloat4x4(&boneData.BoneMatrices[i], XMMatrixIdentity());
-    }
-
-    DrawMeshInternal(mesh, material, worldMatrix, &boneData, mSkinnedPSO.Get());
 }
 
 //cascadeIndex를 매개변수로 받아 지정된 Layer DSV로 바인딩
@@ -248,7 +154,7 @@ void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera&
     mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
-void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix)
+void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix, UINT indexCount, UINT indexStart, INT baseVertexLocation)
 {
     if (mShadowDrawIndex >= kMaxObjectsPerFrame) return;
 
@@ -270,12 +176,13 @@ void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatri
 
     mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
     mCommandList->IASetIndexBuffer(&mesh.GetIndexBufferView());
-    mCommandList->DrawIndexedInstanced(mesh.GetIndexCount(), 1, 0, 0, 0);
+    UINT count = (indexCount > 0) ? indexCount : mesh.GetIndexCount();
+    mCommandList->DrawIndexedInstanced(count, 1, indexStart, baseVertexLocation, 0);
 
     mShadowDrawIndex++;
 }
 
-void D3D12Renderer::DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices)
+void D3D12Renderer::DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices, UINT indexCount, UINT indexStart, INT baseVertexLocation)
 {
     if (mShadowDrawIndex >= kMaxObjectsPerFrame) return;
 
@@ -312,7 +219,8 @@ void D3D12Renderer::DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4
 
     mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
     mCommandList->IASetIndexBuffer(&mesh.GetIndexBufferView());
-    mCommandList->DrawIndexedInstanced(mesh.GetIndexCount(), 1, 0, 0, 0);
+    UINT count = (indexCount > 0) ? indexCount : mesh.GetIndexCount();
+    mCommandList->DrawIndexedInstanced(count, 1, indexStart, baseVertexLocation, 0);
 
     mShadowDrawIndex++;
 }
@@ -341,12 +249,12 @@ void D3D12Renderer::RenderShadow(const RenderQueue& renderQueue)
             {
                 static const std::vector<Matrix4x4> kEmptyBones;
                 const auto& bones = item.BoneMatrices ? *item.BoneMatrices : kEmptyBones;
-                DrawShadowSkinnedMesh(*item.SkinnedMeshPtr, item.WorldMatrix, bones);
+                DrawShadowSkinnedMesh(*item.SkinnedMeshPtr, item.WorldMatrix, bones, item.IndexCount, item.IndexStart, item.BaseVertexLocation);
             }
         }
         else if (item.MeshPtr)
         {
-            DrawShadowMesh(*item.MeshPtr, item.WorldMatrix);
+            DrawShadowMesh(*item.MeshPtr, item.WorldMatrix, item.IndexCount, item.IndexStart, item.BaseVertexLocation);
         }
     }
 }

@@ -38,6 +38,9 @@ void Application::SetupRenderPipeline()
     mRenderPipeline.ClearPasses();
     mRenderPipeline.AddPass<ShadowPass>();
     mRenderPipeline.AddPass<GeometryPass>();
+    // [Post Processing 확장 포인트]:
+    // HDR 버퍼 적용 후 여기에 PostProcessPass(풀스크린 톤매핑/블룸 등)가 등록됩니다:
+    // mRenderPipeline.AddPass<PostProcessPass>();
     mRenderPipeline.AddPass<UIPass>();
 }
 
@@ -164,13 +167,13 @@ std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
     auto obj = std::make_shared<GameObject>();
     obj->SetName(fsPath.stem().string());
 
-    // Mesh, Material 초기화, SourceHandle, Skinned/Static 구분을 한 번에 처리
+    //Mesh, Material 초기화, SourceHandle, Skinned/Static 구분을 한 번에 처리
     ModelUtility::ReplaceModel(*obj, model, handle);
 
     if (model->IsSkinned())
     {
         obj->GetTransform().SetScale(Vector3(0.01f, 0.01f, 0.01f));
-        obj->GetTransform().SetRotation(Vector3(-90.0f, 0.0f, 0.0f)); // 90.0f -> 0.0f로 변경
+        obj->GetTransform().SetRotation(Vector3(-90.0f, 0.0f, 0.0f));
     }
 
     scene->AddGameObject(obj);
@@ -213,10 +216,71 @@ void Application::Run()
         if (scene)
         {
             mHierarchy.Draw(*scene, mEditorState);
-            mLight.Draw(*scene);
+            mLightPanel.Draw(*scene);
         }
         mInspector.Draw(mEditorState, mResourceManager);
         mContentBrowser.Draw();
+
+        // Post Processing 조정 창
+        if (ImGui::Begin("Post Processing"))
+        {
+            //뷰포트 디스플레이 모드 전환
+            const char* displayModes[] = { "Final (LDR)", "Bright Pass Only", "Bloom Blur", "HDR Raw" };
+            int currentDisplayMode = static_cast<int>(mRenderer.GetViewportDisplayMode());
+            if (ImGui::Combo("Viewport Display", &currentDisplayMode, displayModes, IM_ARRAYSIZE(displayModes)))
+            {
+                mRenderer.SetViewportDisplayMode(static_cast<ViewportDisplayMode>(currentDisplayMode));
+            }
+
+            ImGui::Separator();
+            ImGui::Text("Bloom Controls");
+            BrightPassCBData& bpParams = mRenderer.GetBrightPassParams();
+            ToneMappingCBData& tmParams = mRenderer.GetToneMappingParams();
+
+            ImGui::SliderFloat("Bloom Intensity", &tmParams.BloomIntensity, 0.0f, 3.0f, "%.2f");
+            ImGui::SliderFloat("Bloom Threshold", &bpParams.Threshold, 0.0f, 5.0f, "%.2f");
+            ImGui::SliderFloat("Bloom Soft Knee", &bpParams.SoftKnee, 0.0f, 1.0f, "%.2f");
+
+            int blurIter = mRenderer.GetBlurIterations();
+            if (ImGui::SliderInt("Blur Iterations", &blurIter, 1, 4))
+            {
+                mRenderer.SetBlurIterations(blurIter);
+            }
+
+            float blurSigma = mRenderer.GetBlurSigma();
+            if (ImGui::SliderFloat("Blur Spread (Sigma)", &blurSigma, 0.2f, 4.0f, "%.2f"))
+            {
+                mRenderer.SetBlurSigma(blurSigma);
+            }
+
+            ImGui::Separator();
+            ImGui::Text("Tone Mapping & Color");
+
+            const char* toneMappingNames[] = { "None", "Reinhard", "ACES" };
+            int currentType = tmParams.Type;
+            if (ImGui::Combo("Tone Mapping", &currentType, toneMappingNames, IM_ARRAYSIZE(toneMappingNames)))
+            {
+                tmParams.Type = currentType;
+            }
+
+            ImGui::SliderFloat("Exposure", &tmParams.Exposure, 0.1f, 10.0f, "%.2f");
+            ImGui::SliderFloat("Gamma", &tmParams.Gamma, 1.0f, 3.0f, "%.2f");
+
+            if (ImGui::Button("Reset Defaults"))
+            {
+                mRenderer.SetViewportDisplayMode(ViewportDisplayMode::FinalLDR);
+                bpParams.Threshold = 0.6f;
+                bpParams.SoftKnee = 0.5f;
+                mRenderer.SetBlurIterations(1);
+                mRenderer.SetBlurSigma(1.0f);
+
+                tmParams.BloomIntensity = 0.5f;
+                tmParams.Exposure = 1.0f;
+                tmParams.Type = static_cast<int>(ToneMappingType::ACES);
+                tmParams.Gamma = 2.2f;
+            }
+        }
+        ImGui::End();
 
         float newWidth = 0.0f, newHeight = 0.0f, posX = 0.0f, posY = 0.0f;
 

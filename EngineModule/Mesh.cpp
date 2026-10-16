@@ -62,6 +62,15 @@ void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std:
     {
         mBoundingBox.Encapsulate(Vector3(vertex.position[0], vertex.position[1], vertex.position[2]));
     }
+
+    mSubMeshes.clear();
+    SubMesh defaultSubMesh;
+    defaultSubMesh.IndexStart = 0;
+    defaultSubMesh.IndexCount = mIndexCount;
+    defaultSubMesh.BaseVertexLocation = 0;
+    defaultSubMesh.MaterialIndex = 0;
+    defaultSubMesh.Bounds = mBoundingBox;
+    mSubMeshes.push_back(defaultSubMesh);
 }
 
 void Mesh::TransitionToRenderState(ID3D12GraphicsCommandList* cmdList)

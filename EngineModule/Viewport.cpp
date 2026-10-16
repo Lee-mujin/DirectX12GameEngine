@@ -8,6 +8,7 @@
 #include "RayCastHit.h"
 #include "Vector2.h"
 #include "imgui.h"
+#include "ImGuizmo.h"
 
 void Viewport::Draw(
     EditorState& editorState,
@@ -34,10 +35,10 @@ void Viewport::Draw(
     //Viewport 이미지 출력
     ImGui::Image((ImTextureID)textureHandle.ptr, size);
 
-    //Viewport 마우스 클릭 피킹(Picking) 연산
-    if (camera && scene && ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    //Viewport 마우스 클릭 피킹(Picking) 연산 (기즈모 조작 중에는 피킹 방지)
+    if (camera && scene && ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
     {
-        //기즈모 조작 중(ImGuizmo 사용 시)에는 피킹 방지 조건 추가 가능
         ImVec2 mousePos = ImGui::GetMousePos();
 
         //Viewport 텍스처 영역 내 상대 마우스 좌표 계산
