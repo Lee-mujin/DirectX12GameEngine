@@ -6,6 +6,7 @@
 
 class Mesh;
 class SkinnedMesh;
+class Texture;
 
 //렌더러와 상위 레벨(Material, Texture, GameObject) 간의 의존성을 격리하는 경량 커맨드 구조체
 struct RenderItem
@@ -24,6 +25,11 @@ struct RenderItem
     D3D12_GPU_DESCRIPTOR_HANDLE BaseTextureHandle = { 0 };
     D3D12_GPU_DESCRIPTOR_HANDLE NormalTextureHandle = { 0 };
     bool HasNormalMap = false;
+
+    // 업로드 직후 텍스처 상태 전이를 위해 렌더러가 단기간 참조하는 포인터.
+    // (RenderItem은 프레임 단위로만 사용되며 소유권은 Material이 가진다.)
+    const Texture* BaseTexturePtr = nullptr;
+    const Texture* NormalTexturePtr = nullptr;
 
     //머티리얼 상수 속성
     Vector3 BaseColor{ 1.0f, 1.0f, 1.0f };

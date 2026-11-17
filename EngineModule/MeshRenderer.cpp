@@ -107,12 +107,14 @@ void MeshRenderer::SubmitRenderItem(RenderQueue& renderQueue)
         if (auto baseTex = matInst.GetTexture())
         {
             item.BaseTextureHandle = baseTex->GetSrvHandle();
+            item.BaseTexturePtr = baseTex.get();
         }
 
         //Normal Map GPU 핸들 추출
         if (auto normTex = matInst.GetNormalTexture())
         {
             item.NormalTextureHandle = normTex->GetSrvHandle();
+            item.NormalTexturePtr = normTex.get();
             item.HasNormalMap = true;
         }
 

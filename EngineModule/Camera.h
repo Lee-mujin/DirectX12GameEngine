@@ -9,6 +9,9 @@ class Camera
 {
 public:
     void Initialize(float aspect);
+    // 뷰포트/창 크기 변경 시 종횡비를 갱신한다.
+    void SetAspect(float aspect) { mAspect = (aspect > 0.0001f) ? aspect : 1.0f; }
+    float GetAspect() const { return mAspect; }
     void Update(Input* input, float deltaTime);
 
     Matrix4x4 GetView() const;

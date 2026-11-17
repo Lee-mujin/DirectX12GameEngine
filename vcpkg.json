@@ -1,0 +1,8 @@
+{
+  "name": "dx12-game-engine",
+  "version-string": "0.1.0",
+  "description": "DirectX 12 game engine + editor demo (Assimp model loading).",
+  "dependencies": [
+    "assimp"
+  ]
+}

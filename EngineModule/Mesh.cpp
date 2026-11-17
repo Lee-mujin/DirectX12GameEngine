@@ -49,6 +49,10 @@ void Mesh::Create(ID3D12Device* device, UploadContext* uploadContext, const std:
         cmdList->CopyBufferRegion(mIndexBuffer.Get(), 0, mIndexUploadBuffer.Get(), 0, indexBufferSize);
         });
 
+    // 복사가 완료되면 업로드 힙을 반환한다 (GPU 메모리 2배 점유 방지).
+    uploadContext->ReleaseWhenComplete(std::move(mVertexUploadBuffer));
+    uploadContext->ReleaseWhenComplete(std::move(mIndexUploadBuffer));
+
     mVertexBufferView.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
     mVertexBufferView.StrideInBytes = sizeof(Vertex);
     mVertexBufferView.SizeInBytes = vertexBufferSize;

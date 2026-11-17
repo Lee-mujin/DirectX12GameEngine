@@ -2,6 +2,7 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 #include "DescriptorAllocator.h"
+#include "EngineConstants.h"
 
 class ShadowMap
 {
@@ -19,7 +20,7 @@ public:
 
 private:
     UINT mSize = 2048;
-    static constexpr UINT kCascadeCount = 3; //Cascade 3개 (Near, Mid, Far)
+    static constexpr UINT kCascadeCount = kEngineCascadeCount; //Near / Mid / Far
 
     Microsoft::WRL::ComPtr<ID3D12Resource> mShadowMapArray;
 

@@ -12,6 +12,18 @@ using namespace DirectX;
 
 extern XMMATRIX D3D12RendererToXM(const Matrix4x4& m);
 
+namespace
+{
+    // 조용히 드로우를 건너뛰지 않고 디버그 출력으로 남긴다.
+    void WarnDrawLimit(const char* pass)
+    {
+        char msg[192];
+        sprintf_s(msg, "[Renderer] %s draw slot limit (%u submeshes) reached; draw skipped.\n",
+            pass, kEngineMaxObjectsPerFrame);
+        OutputDebugStringA(msg);
+    }
+}
+
 //메시 상태 전이 및 인덱스 기반 DrawCall 수행
 void D3D12Renderer::DrawGeometry(const Mesh& mesh, UINT indexCount, UINT indexStart, INT baseVertexLocation)
 {
@@ -24,6 +36,10 @@ void D3D12Renderer::DrawGeometry(const Mesh& mesh, UINT indexCount, UINT indexSt
 
 void D3D12Renderer::BindItemTextures(const RenderItem& item)
 {
+    // Copy Queue 업로드 후 상태는 COMMON으로 decay 되므로 Graphics List에서 명시적으로 SRV로 전이한다.
+    if (item.BaseTexturePtr) const_cast<Texture*>(item.BaseTexturePtr)->TransitionToRenderState(mCommandList.Get());
+    if (item.NormalTexturePtr) const_cast<Texture*>(item.NormalTexturePtr)->TransitionToRenderState(mCommandList.Get());
+
     if (item.BaseTextureHandle.ptr != 0)
     {
         mCommandList->SetGraphicsRootDescriptorTable(static_cast<UINT>(RootSlot::BaseTexture), item.BaseTextureHandle);
@@ -91,7 +107,11 @@ void D3D12Renderer::UploadBoneCB(const std::vector<Matrix4x4>* boneMatrices)
 
 void D3D12Renderer::DrawRenderItem(const RenderItem& item)
 {
-    if (mObjectDrawIndex >= kMaxObjectsPerFrame) return;
+    if (mObjectDrawIndex >= kMaxObjectsPerFrame)
+    {
+        WarnDrawLimit("Main pass");
+        return;
+    }
 
     ID3D12PipelineState* pso = item.IsSkinned() ? mSkinnedPSO.Get() : mPSO.Get();
     mCommandList->SetPipelineState(pso);
@@ -142,7 +162,10 @@ void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera&
         mCascadeSplits = csmData.SplitDistances;
     }
 
-    //현재 패스의 LightViewProj 지정
+    //현재 패스의 LightViewProj 지정 및 Cascade별 CB 영역 기록 위치 설정
+    mCurrentCascadeIndex = cascadeIndex;
+    // 인덱스는 Cascade마다 0부터 시작한다(3개 Cascade 누적 시 64 슬롯을 금방 넘었음).
+    mShadowDrawIndex = 0;
     mLightViewProj = mCascadeLightViewProj[cascadeIndex];
 
     //D32_FLOAT 전용 Texture2DArray 지정 Layer DSV 바인딩
@@ -156,7 +179,11 @@ void D3D12Renderer::BeginShadowPass(const DirectionalLight& light, const Camera&
 
 void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatrix, UINT indexCount, UINT indexStart, INT baseVertexLocation)
 {
-    if (mShadowDrawIndex >= kMaxObjectsPerFrame) return;
+    if (mShadowDrawIndex >= kMaxObjectsPerFrame)
+    {
+        WarnDrawLimit("Shadow pass");
+        return;
+    }
 
     const_cast<Mesh&>(mesh).TransitionToRenderState(mCommandList.Get());
 
@@ -168,10 +195,12 @@ void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatri
     ShadowCBData cbData;
     XMStoreFloat4x4(&cbData.WorldLightViewProj, XMMatrixTranspose(D3D12RendererToXM(worldMatrix * mLightViewProj)));
 
-    UINT8* dest = fr.shadowCBMapped + mShadowDrawIndex * fr.shadowCBStride;
+    // Cascade별로 ShadowCB 영역을 분리한다(같은 주소를 3개 Cascade가 공유하지 않도록).
+    const UINT shadowSlot = mCurrentCascadeIndex * kMaxObjectsPerFrame + mShadowDrawIndex;
+    UINT8* dest = fr.shadowCBMapped + shadowSlot * fr.shadowCBStride;
     memcpy(dest, &cbData, sizeof(cbData));
 
-    D3D12_GPU_VIRTUAL_ADDRESS addr = fr.shadowCB->GetGPUVirtualAddress() + mShadowDrawIndex * fr.shadowCBStride;
+    D3D12_GPU_VIRTUAL_ADDRESS addr = fr.shadowCB->GetGPUVirtualAddress() + shadowSlot * fr.shadowCBStride;
     mCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(ShadowRootSlot::ShadowCB), addr);
 
     mCommandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
@@ -184,7 +213,11 @@ void D3D12Renderer::DrawShadowMesh(const Mesh& mesh, const Matrix4x4& worldMatri
 
 void D3D12Renderer::DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& boneMatrices, UINT indexCount, UINT indexStart, INT baseVertexLocation)
 {
-    if (mShadowDrawIndex >= kMaxObjectsPerFrame) return;
+    if (mShadowDrawIndex >= kMaxObjectsPerFrame)
+    {
+        WarnDrawLimit("Shadow pass (skinned)");
+        return;
+    }
 
     const_cast<SkinnedMesh&>(mesh).TransitionToRenderState(mCommandList.Get());
 
@@ -200,19 +233,24 @@ void D3D12Renderer::DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4
             XMStoreFloat4x4(&boneData.BoneMatrices[i], XMMatrixIdentity());
     }
 
-    UINT8* boneDest = fr.boneCBMapped + mShadowDrawIndex * fr.boneCBStride;
+    // Main BoneCB 영역(0..kMaxObjectsPerFrame-1)과 겹치지 않도록 Cascade별 오프셋을 더한다.
+    // GPU는 명령 기록 시점이 아니라 실행 시점에 CB를 읽으므로 반드시 주소를 분리해야 한다.
+    const UINT shadowSlot = mCurrentCascadeIndex * kMaxObjectsPerFrame + mShadowDrawIndex;
+    const UINT boneSlot = kMaxObjectsPerFrame + shadowSlot;
+
+    UINT8* boneDest = fr.boneCBMapped + boneSlot * fr.boneCBStride;
     memcpy(boneDest, &boneData, sizeof(BoneCBData));
 
-    D3D12_GPU_VIRTUAL_ADDRESS boneCBAddress = fr.boneCB->GetGPUVirtualAddress() + mShadowDrawIndex * fr.boneCBStride;
+    D3D12_GPU_VIRTUAL_ADDRESS boneCBAddress = fr.boneCB->GetGPUVirtualAddress() + boneSlot * fr.boneCBStride;
     mCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(ShadowRootSlot::BoneCB), boneCBAddress);
 
     ShadowCBData cbData = {};
     XMStoreFloat4x4(&cbData.WorldLightViewProj, XMMatrixTranspose(D3D12RendererToXM(worldMatrix * mLightViewProj)));
 
-    UINT8* shadowDest = fr.shadowCBMapped + mShadowDrawIndex * fr.shadowCBStride;
+    UINT8* shadowDest = fr.shadowCBMapped + shadowSlot * fr.shadowCBStride;
     memcpy(shadowDest, &cbData, sizeof(cbData));
 
-    D3D12_GPU_VIRTUAL_ADDRESS shadowCBAddress = fr.shadowCB->GetGPUVirtualAddress() + mShadowDrawIndex * fr.shadowCBStride;
+    D3D12_GPU_VIRTUAL_ADDRESS shadowCBAddress = fr.shadowCB->GetGPUVirtualAddress() + shadowSlot * fr.shadowCBStride;
     mCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(ShadowRootSlot::ShadowCB), shadowCBAddress);
 
     mCommandList->SetPipelineState(mShadowSkinnedPSO.Get());
@@ -228,7 +266,7 @@ void D3D12Renderer::DrawShadowSkinnedMesh(const SkinnedMesh& mesh, const Matrix4
 void D3D12Renderer::EndShadowPass()
 {
     mShadowMap.EndPass(mCommandList.Get());
-    mShadowDrawIndex = 0;
+    // 인덱스 리셋은 BeginShadowPass에서 Cascade마다 수행한다.
 }
 
 void D3D12Renderer::Render(const RenderQueue& renderQueue)

@@ -10,6 +10,7 @@
 
 class GameObject;
 class CameraComponent;
+class Camera;
 class Input;
 
 class Scene
@@ -17,7 +18,7 @@ class Scene
 public:
     void Update(Input* input, float deltaTime);
 
-    void BuildRenderQueue(RenderQueue& outQueue);
+    void BuildRenderQueue(RenderQueue& outQueue, const Camera* camera = nullptr, UINT* outCulledCount = nullptr);
 
     void AddGameObject(std::shared_ptr<GameObject> object);
     void SetMainCamera(CameraComponent* camera) { mMainCamera = camera; }

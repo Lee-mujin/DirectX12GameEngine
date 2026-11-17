@@ -17,7 +17,10 @@ cbuffer CameraCB : register(b1)
     float gCameraPad;
 };
 
+// C++에서 -D 매크로로 주입한다(kEngineMaxBones). 단독 컴파일용 폴백.
+#ifndef MAX_BONES
 #define MAX_BONES 96
+#endif
 cbuffer BoneCB : register(b3)
 {
     matrix gBoneMatrices[MAX_BONES];
@@ -33,7 +36,10 @@ cbuffer LightCB : register(b2)
     
     // Light Space 변환 행렬 (Directional Light 전용)
     // C++ LightCBData 규격(WorldLightViewProj[3])에 맞춰 3개 캐스케이드 행렬 및 분할 거리 추가
-    matrix gWorldLightViewProj[3];
+#ifndef CASCADE_COUNT
+#define CASCADE_COUNT 3
+#endif
+    matrix gWorldLightViewProj[CASCADE_COUNT];
     float4 gCascadeSplits; // x: Near, y: Mid, z: Far
 
     // point light parameters

@@ -85,6 +85,8 @@ public:
 
     void InitializeViewport(UINT width, UINT height);
     void ResizeViewport(UINT width, UINT height);
+    // 창 리사이즈: 스왑체인/백버퍼 RTV/메인 DSV/뷰포트를 재생성한다.
+    void ResizeSwapChain(UINT width, UINT height);
     D3D12_GPU_DESCRIPTOR_HANDLE GetViewportSrvHandle() const;
     DXGI_FORMAT GetViewportFormat() const { return mViewportFormat; }
     void SetViewportFormat(DXGI_FORMAT format) { mViewportFormat = format; }
@@ -117,6 +119,9 @@ public:
     const ToneMappingCBData& GetToneMappingParams() const { return mToneMappingParams; }
     void SetToneMappingParams(const ToneMappingCBData& params) { mToneMappingParams = params; }
     void SetDefaultWhiteTexture(std::shared_ptr<Texture> texture) { mDefaultWhiteTexture = texture; }
+
+    // 직전 프레임의 실제 드로우 수 (통계 표시용)
+    UINT GetLastDrawCount() const { return mObjectDrawIndex; }
 
     bool InitializeShadowMap(); //Initialize() 안에서 호출
 
@@ -166,6 +171,7 @@ private:
     void CreateSwapChain();
     void CreateRenderTargetViews();
     void CreateDepthStencil();
+    void RecreateDepthStencil();
     void SetupViewport();
     void CreateShader();
     void CreateRootSignature();
@@ -173,9 +179,10 @@ private:
 
 private:
     static constexpr UINT kFrameCount = 2;
-    static constexpr UINT kMaxObjectsPerFrame = 64;
-    static constexpr UINT kMaxSrvCount = 32;
-    static constexpr UINT kCascadeCount = 3; //Cascade 개수 상수 정의
+    // 서브메시 draw 단위 한도. 기존 64는 캐릭터 2명 + 큐브에서 바로 포화되었다.
+    static constexpr UINT kMaxObjectsPerFrame = kEngineMaxObjectsPerFrame;
+    static constexpr UINT kMaxSrvCount = kEngineMaxSrvCount;
+    static constexpr UINT kCascadeCount = kEngineCascadeCount;
 
     HWND mHwnd = nullptr;
     UINT mWidth = 0;
@@ -202,6 +209,8 @@ private:
 
     ComPtr<ID3D12Resource> mBackBuffers[kFrameCount];
     ComPtr<ID3D12Resource> mDepthStencilBuffer;
+    // 메인 DSV 핸들은 리사이즈 시에도 재사용한다(HDR 패스가 슬롯 0을 참조).
+    DescriptorHandle mMainDsvHandle;
 
     ComPtr<ID3D12RootSignature> mRootSignature;
     ComPtr<ID3D12PipelineState> mPSO;
@@ -233,11 +242,12 @@ private:
     ComPtr<ID3DBlob> mShadowVertexShader;
     ComPtr<ID3DBlob> mShadowSkinnedVertexShader;
     UINT mShadowDrawIndex = 0;
+    UINT mCurrentCascadeIndex = 0; // 현재 기록 중인 Cascade (CB 영역 분리용)
     Matrix4x4 mLightViewProj; //Main Pass 셰이더에 넘길 때 씀
 
     bool mIsCommandListRecording = false;
 
-    Matrix4x4 mCascadeLightViewProj[3];
+    Matrix4x4 mCascadeLightViewProj[kCascadeCount];
     Vector3 mCascadeSplits;
 
     float mClearColor[4] = { 0.0f, 0.2f, 0.6f, 1.0f };

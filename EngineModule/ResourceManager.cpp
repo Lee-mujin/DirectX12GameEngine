@@ -78,10 +78,10 @@ std::shared_ptr<Mesh> ResourceManager::GetCubeMesh()
     return mCubeMesh;
 }
 
-std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::wstring& path)
+std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::wstring& path, bool srgb)
 {
     if (!mTextureLoader) return nullptr;
-    return mTextureLoader->LoadTextureFromFile(path);
+    return mTextureLoader->LoadTextureFromFile(path, srgb);
 }
 
 std::shared_ptr<Texture> ResourceManager::GetDefaultWhiteTexture()
@@ -158,21 +158,24 @@ void ResourceManager::FlushUploads()
     }
 }
 
-std::shared_ptr<Texture> ResourceManager::GetOrLoadTexture(AssetHandle handle)
+std::shared_ptr<Texture> ResourceManager::GetOrLoadTexture(AssetHandle handle, bool srgb)
 {
     if (!handle.IsValid()) return nullptr;
 
-    auto it = mTextureCache.find(handle.GetId());
+    // 같은 파일을 sRGB/선형으로 각각 쓸 수 있도록 캐시 키에 색공간을 포함한다.
+    const uint64_t cacheKey = handle.GetId() ^ (srgb ? 0x8000000000000000ULL : 0ULL);
+
+    auto it = mTextureCache.find(cacheKey);
     if (it != mTextureCache.end()) return it->second;
 
     const std::string& pathStr = GetPath(handle);
     if (pathStr.empty()) return nullptr;
 
     std::wstring widePath(pathStr.begin(), pathStr.end());
-    auto texture = LoadTexture(widePath);
+    auto texture = LoadTexture(widePath, srgb);
     if (texture)
     {
-        mTextureCache[handle.GetId()] = texture;
+        mTextureCache[cacheKey] = texture;
     }
 
     return texture;

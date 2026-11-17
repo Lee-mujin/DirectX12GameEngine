@@ -161,7 +161,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
             {
                 if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
                 {
-                    auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt);
+                    auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt, true); // Base Color는 sRGB
                     if (newTexture)
                     {
                         matInst.SetTexture(newTexture);
@@ -190,7 +190,7 @@ void Inspector::Draw(EditorState& editorState, ResourceManager& resourceManager)
             {
                 if (resourceManager.GetAssetType(*handleOpt) == AssetType::Texture)
                 {
-                    auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt);
+                    auto newTexture = resourceManager.GetOrLoadTexture(*handleOpt, false); // Normal은 선형
                     if (newTexture)
                     {
                         matInst.SetNormalTexture(newTexture);

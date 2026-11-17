@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <filesystem>
+#include "EngineConstants.h"
 
 namespace
 {
@@ -174,12 +175,13 @@ std::vector<std::shared_ptr<Material>> ModelLoader::LoadMaterials(
 
     std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
 
-    auto LoadTextureFromAssimp = [&](const aiString& texPath) -> std::shared_ptr<Texture>
+    auto LoadTextureFromAssimp = [&](const aiString& texPath, bool srgb) -> std::shared_ptr<Texture>
     {
         if (texPath.length == 0 || !textureLoader) return nullptr;
         std::string pathStr = texPath.C_Str();
 
-        auto it = textureCache.find(pathStr);
+        const std::string cacheKey = pathStr + (srgb ? "|srgb" : "|linear");
+        auto it = textureCache.find(cacheKey);
         if (it != textureCache.end()) return it->second;
 
         std::shared_ptr<Texture> loadedTexture = nullptr;
@@ -191,7 +193,7 @@ std::vector<std::shared_ptr<Material>> ModelLoader::LoadMaterials(
             if (embeddedTex->mHeight == 0)
             {
                 // 압축 포맷 (PNG, JPG 등): mWidth가 파일 바이트 수
-                loadedTexture = textureLoader->LoadTextureFromMemory(embeddedTex->pcData, embeddedTex->mWidth);
+                loadedTexture = textureLoader->LoadTextureFromMemory(embeddedTex->pcData, embeddedTex->mWidth, srgb);
             }
             else
             {
@@ -205,7 +207,7 @@ std::vector<std::shared_ptr<Material>> ModelLoader::LoadMaterials(
                     rgba[p * 4 + 2] = src[p].b;
                     rgba[p * 4 + 3] = src[p].a;
                 }
-                loadedTexture = textureLoader->CreateTextureFromRawRGBA(rgba.data(), embeddedTex->mWidth, embeddedTex->mHeight);
+                loadedTexture = textureLoader->CreateTextureFromRawRGBA(rgba.data(), embeddedTex->mWidth, embeddedTex->mHeight, srgb);
             }
         }
         else
@@ -222,13 +224,13 @@ std::vector<std::shared_ptr<Material>> ModelLoader::LoadMaterials(
 
             if (fs::exists(resolvedPath))
             {
-                loadedTexture = textureLoader->LoadTextureFromFile(resolvedPath.wstring());
+                loadedTexture = textureLoader->LoadTextureFromFile(resolvedPath.wstring(), srgb);
             }
         }
 
         if (loadedTexture)
         {
-            textureCache[pathStr] = loadedTexture;
+            textureCache[cacheKey] = loadedTexture;
         }
         return loadedTexture;
     };
@@ -265,7 +267,7 @@ std::vector<std::shared_ptr<Material>> ModelLoader::LoadMaterials(
         if (aiMat->GetTexture(aiTextureType_BASE_COLOR, 0, &texPath) == AI_SUCCESS ||
             aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS)
         {
-            auto tex = LoadTextureFromAssimp(texPath);
+            auto tex = LoadTextureFromAssimp(texPath, true); // Base Color: sRGB
             if (tex)
             {
                 mat->SetBaseColorTexture(tex);
@@ -277,7 +279,7 @@ std::vector<std::shared_ptr<Material>> ModelLoader::LoadMaterials(
         if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &normalPath) == AI_SUCCESS ||
             aiMat->GetTexture(aiTextureType_HEIGHT, 0, &normalPath) == AI_SUCCESS)
         {
-            auto normTex = LoadTextureFromAssimp(normalPath);
+            auto normTex = LoadTextureFromAssimp(normalPath, false); // Normal: 선형
             if (normTex)
             {
                 mat->SetNormalTexture(normTex);
@@ -308,6 +310,9 @@ std::shared_ptr<Mesh> ModelLoader::LoadStaticMesh(
         aiProcess_GenSmoothNormals |
         aiProcess_CalcTangentSpace |
         aiProcess_JoinIdenticalVertices |
+        // 정적 메시는 노드 계층의 피벗/스케일을 정점에 베이크해야 한다.
+        // (glTF/FBX에서 노드 변환을 무르면 모델이 원점에 뭉치거나 크기가 틀어진다.)
+        aiProcess_PreTransformVertices |
         aiProcess_ConvertToLeftHanded;
 
     const aiScene* scene = importer.ReadFile(validPath, flags);
@@ -451,6 +456,17 @@ std::shared_ptr<SkinnedMesh> ModelLoader::LoadSkinnedMesh(
         };
 
     MapHierarchy(MapHierarchy, scene->mRootNode, -1);
+
+    // HLSL의 gBoneMatrices[MAX_BONES] 범위를 넘으면 셰이더가 OOB 메모리를 읽는다.
+    // 로드 시점에 명확히 거부한다.
+    if (skeleton->Bones.size() > kEngineMaxBones)
+    {
+        char msg[256];
+        sprintf_s(msg, "[ModelLoader] Skeleton has %zu bones (max %u): '%s' rejected to avoid shader OOB.\n",
+            skeleton->Bones.size(), static_cast<unsigned int>(kEngineMaxBones), validPath.c_str());
+        OutputDebugStringA(msg);
+        return nullptr;
+    }
 
     //정점에 본 인덱스와 가중치 할당
     for (unsigned int m = 0; m < scene->mNumMeshes; ++m)

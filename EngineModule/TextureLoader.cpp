@@ -6,6 +6,7 @@
 #include <wincodec.h>
 #include <shlwapi.h>
 #pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "windowscodecs.lib")
 
 namespace
 {
@@ -91,7 +92,7 @@ bool TextureLoader::DecodeWICMemory(const void* data, size_t sizeBytes, std::vec
     return SUCCEEDED(converter->CopyPixels(nullptr, outWidth * 4, static_cast<UINT>(outPixels.size()), outPixels.data()));
 }
 
-std::shared_ptr<Texture> TextureLoader::LoadTextureFromMemory(const void* data, size_t sizeBytes)
+std::shared_ptr<Texture> TextureLoader::LoadTextureFromMemory(const void* data, size_t sizeBytes, bool srgb)
 {
     std::vector<BYTE> pixels;
     UINT width = 0, height = 0;
@@ -105,14 +106,15 @@ std::shared_ptr<Texture> TextureLoader::LoadTextureFromMemory(const void* data, 
 
     auto texture = std::make_shared<Texture>();
 
-    mUploadContext->Execute([this, pixels = std::move(pixels), width, height, srvHandle, texture](ID3D12GraphicsCommandList* cmdList) {
-        texture->CreateFromPixels(mDevice, cmdList, pixels.data(), width, height, srvHandle);
+    mUploadContext->Execute([this, pixels = std::move(pixels), width, height, srvHandle, srgb, texture](ID3D12GraphicsCommandList* cmdList) {
+        texture->CreateFromPixels(mDevice, cmdList, pixels.data(), width, height, srvHandle, srgb);
         });
+    texture->ReleaseUploadBuffer(mUploadContext);
 
     return texture;
 }
 
-std::shared_ptr<Texture> TextureLoader::CreateTextureFromRawRGBA(const void* pixels, UINT width, UINT height)
+std::shared_ptr<Texture> TextureLoader::CreateTextureFromRawRGBA(const void* pixels, UINT width, UINT height, bool srgb)
 {
     if (!pixels || width == 0 || height == 0) return nullptr;
 
@@ -123,14 +125,15 @@ std::shared_ptr<Texture> TextureLoader::CreateTextureFromRawRGBA(const void* pix
     auto texture = std::make_shared<Texture>();
     std::vector<BYTE> pixelData(static_cast<const BYTE*>(pixels), static_cast<const BYTE*>(pixels) + (width * height * 4));
 
-    mUploadContext->Execute([this, pixelData = std::move(pixelData), width, height, srvHandle, texture](ID3D12GraphicsCommandList* cmdList) {
-        texture->CreateFromPixels(mDevice, cmdList, pixelData.data(), width, height, srvHandle);
+    mUploadContext->Execute([this, pixelData = std::move(pixelData), width, height, srvHandle, srgb, texture](ID3D12GraphicsCommandList* cmdList) {
+        texture->CreateFromPixels(mDevice, cmdList, pixelData.data(), width, height, srvHandle, srgb);
         });
+    texture->ReleaseUploadBuffer(mUploadContext);
 
     return texture;
 }
 
-std::shared_ptr<Texture> TextureLoader::LoadTextureFromFile(const std::wstring& path)
+std::shared_ptr<Texture> TextureLoader::LoadTextureFromFile(const std::wstring& path, bool srgb)
 {
     std::vector<BYTE> pixels;
     UINT width = 0, height = 0;
@@ -145,9 +148,10 @@ std::shared_ptr<Texture> TextureLoader::LoadTextureFromFile(const std::wstring& 
 
     auto texture = std::make_shared<Texture>();
 
-    mUploadContext->Execute([this, pixels = std::move(pixels), width, height, srvHandle, texture](ID3D12GraphicsCommandList* cmdList) {
-        texture->CreateFromPixels(mDevice, cmdList, pixels.data(), width, height, srvHandle);
+    mUploadContext->Execute([this, pixels = std::move(pixels), width, height, srvHandle, srgb, texture](ID3D12GraphicsCommandList* cmdList) {
+        texture->CreateFromPixels(mDevice, cmdList, pixels.data(), width, height, srvHandle, srgb);
         });
+    texture->ReleaseUploadBuffer(mUploadContext);
 
     return texture;
 }
@@ -162,8 +166,9 @@ std::shared_ptr<Texture> TextureLoader::CreateSolidColorTexture(BYTE r, BYTE g, 
     std::vector<BYTE> pixel = { r, g, b, a };
 
     mUploadContext->Execute([this, pixel = std::move(pixel), srvHandle, texture](ID3D12GraphicsCommandList* cmdList) {
-        texture->CreateFromPixels(mDevice, cmdList, pixel.data(), 1, 1, srvHandle);
+        texture->CreateFromPixels(mDevice, cmdList, pixel.data(), 1, 1, srvHandle, false);
         });
+    texture->ReleaseUploadBuffer(mUploadContext);
 
     return texture;
 }

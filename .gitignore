@@ -1,12 +1,57 @@
-.vs/
-Debug/
-Release/
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Dd]ebugPublic/
+[Rr]eleasePublic/
 x64/
 x86/
-
-*.obj
+[Ww]in32/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+ipch/
+*.aps
+*.pch
 *.pdb
 *.ilk
+*.idb
+*.obj
+*.iobj
+*.ipdb
+*.tlog
+*.exp
+*.lib
 *.exe
 *.dll
+*.pdb
+*.lastbuildstate
 *.VC.db
+*.VC.opendb
+
+# Visual Studio user files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.opensdf
+*.ncb
+
+# ImGui runtime state
+imgui.ini
+
+# vcpkg
+vcpkg_installed/
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~
+
+# Large binary assets are tracked explicitly via Git LFS (see README).
+# Uncomment if you prefer to keep them out of the repository:
+# *.glb
+# *.fbx

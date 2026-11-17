@@ -48,7 +48,8 @@ void D3D12Renderer::InitializeHDRRenderTarget(UINT width, UINT height)
     mHDRRtvHandle.ptr = mRtvAllocator.GetHeap()->GetCPUDescriptorHandleForHeapStart().ptr +
         (static_cast<SIZE_T>(kFrameCount + 1) * mRtvAllocator.GetDescriptorSize());
 
-    mHDRDsvHandle = mDsvAllocator.GetHeap()->GetCPUDescriptorHandleForHeapStart();
+    // 메인 깊이 버퍼의 DSV를 재사용 (리사이즈 시에도 동일 슬롯이 갱신됨).
+    mHDRDsvHandle = mMainDsvHandle.CpuHandle;
 
     if (!mIsHDRSrvAllocated)
     {
@@ -118,6 +119,32 @@ void D3D12Renderer::ResizeViewport(UINT width, UINT height)
     InitializeViewport(width, height);
     InitializeHDRRenderTarget(width, height);
     InitializeBloomRenderTargets(width, height);
+}
+
+void D3D12Renderer::ResizeSwapChain(UINT width, UINT height)
+{
+    if (width == 0 || height == 0) return;
+    if (width == mWidth && height == mHeight) return;
+
+    // 백버퍼를 참조하는 GPU 작업이 끝날 때까지 대기한 뒤에만 해제/재생성한다.
+    WaitForGpu();
+
+    for (UINT i = 0; i < kFrameCount; ++i)
+    {
+        mBackBuffers[i].Reset();
+    }
+
+    DXGI_SWAP_CHAIN_DESC1 desc = {};
+    ThrowIfFailed(mSwapChain->GetDesc1(&desc));
+    ThrowIfFailed(mSwapChain->ResizeBuffers(kFrameCount, width, height, desc.Format, desc.Flags));
+
+    mWidth = width;
+    mHeight = height;
+    mFrameIndex = mSwapChain->GetCurrentBackBufferIndex();
+
+    CreateRenderTargetViews();
+    RecreateDepthStencil();
+    SetupViewport();
 }
 
 void D3D12Renderer::ExecuteBrightPass()

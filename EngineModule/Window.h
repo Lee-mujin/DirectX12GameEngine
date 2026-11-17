@@ -15,6 +15,10 @@ public:
     int GetWidth() const { return mWidth; }
     int GetHeight() const { return mHeight; }
 
+    // WM_SIZE 수신 여부. Application이 이 플래그를 소비하고 스왑체인을 재생성한다.
+    bool IsResizePending() const { return mResizePending; }
+    void ConsumeResize() { mResizePending = false; }
+
 private:
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT32 msg, WPARAM wParam, LPARAM lParam);
 
@@ -23,6 +27,7 @@ private:
     HINSTANCE mInstance = nullptr;
     int mWidth = 0;
     int mHeight = 0;
+    bool mResizePending = false;
 
     Input* mInput = nullptr; //Application이 연결만 해줌
 

@@ -23,10 +23,10 @@ void Scene::Update(Input* input, float deltaTime)
     }
 }
 
-void Scene::BuildRenderQueue(RenderQueue& outQueue)
+void Scene::BuildRenderQueue(RenderQueue& outQueue, const Camera* camera, UINT* outCulledCount)
 {
-    //렌더 시스템을 통해 RenderItem 패킷 일괄 수집
-    mRenderSystem.BuildRenderQueue(mObjects, outQueue);
+    //렌더 시스템을 통해 RenderItem 패킷 일괄 수집 (프러스텀 컬링 포함)
+    mRenderSystem.BuildRenderQueue(mObjects, outQueue, camera, outCulledCount);
 }
 
 void Scene::AddGameObject(std::shared_ptr<GameObject> object)

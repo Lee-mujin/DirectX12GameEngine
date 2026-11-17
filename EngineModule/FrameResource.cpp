@@ -34,9 +34,20 @@ void FrameResource::Create(ID3D12Device* device, UINT maxObjectCount)
     CreateUploadBuffer(device, Align256(sizeof(CameraCBData)), cameraCB, &cameraCBMapped);
     CreateUploadBuffer(device, Align256(sizeof(LightCBData)), lightCB, &lightCBMapped);
 
+    // BoneCB:
+    //   [0 .. maxObjectCount-1]                         : Main Pass (mObjectDrawIndex)
+    //   [maxObjectCount + cascade*maxObjectCount .. ]   : Shadow Pass (cascade별 분리)
+    // ShadowCB:
+    //   [cascade*maxObjectCount .. ]                    : Cascade별 분리
+    //
+    // 이전에는 Main BoneCB와 Shadow BoneCB가 같은 주소 공간을 공유해서,
+    // 한 프레임 안에서 Shadowdraw가 읽기 전에 Main 업로드가 값을 덮어쓰는
+    // 문제가 있었다(스키닝 그림자 오염).
+    const UINT shadowSlotCount = maxObjectCount * kNumCascades;
+
     boneCBStride = Align256(sizeof(BoneCBData));
-    CreateUploadBuffer(device, boneCBStride * maxObjectCount, boneCB, &boneCBMapped);
+    CreateUploadBuffer(device, boneCBStride * (maxObjectCount + shadowSlotCount), boneCB, &boneCBMapped);
 
     shadowCBStride = Align256(sizeof(ShadowCBData));
-    CreateUploadBuffer(device, shadowCBStride * maxObjectCount, shadowCB, &shadowCBMapped);
+    CreateUploadBuffer(device, shadowCBStride * shadowSlotCount, shadowCB, &shadowCBMapped);
 }

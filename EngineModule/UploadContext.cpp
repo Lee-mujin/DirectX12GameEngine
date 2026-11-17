@@ -23,19 +23,51 @@ bool UploadContext::Initialize(ID3D12Device* device)
     return mFenceEvent != nullptr;
 }
 
+void UploadContext::ProcessCompletedReleases()
+{
+    if (!mFence) return;
+
+    const UINT64 completed = mFence->GetCompletedValue();
+    for (auto it = mPendingReleases.begin(); it != mPendingReleases.end(); )
+    {
+        if (completed >= it->FenceValue)
+        {
+            it = mPendingReleases.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+void UploadContext::ReleaseWhenComplete(ComPtr<ID3D12Resource> resource)
+{
+    if (!resource) return;
+
+    PendingRelease pending;
+    pending.FenceValue = mFenceValue;
+    pending.Resource = std::move(resource);
+    mPendingReleases.push_back(std::move(pending));
+}
+
 void UploadContext::SyncWithGraphicsQueue(ID3D12CommandQueue* graphicsQueue)
 {
-    if (!graphicsQueue) return;
+    // 업로드가 없으면 GPU Wait를 걸지 않는다 (불필요한 큐 직렬화 방지).
+    if (!graphicsQueue || !mCopyQueue || !mFence || !mHasPendingUploads) return;
 
     mFenceValue++;
     //Copy Queue에 Signal 신호 적재
-    mCopyQueue->Signal(mFence.Get(), mFenceValue);
+    if (FAILED(mCopyQueue->Signal(mFence.Get(), mFenceValue))) return;
     //Graphics Queue가 CPU 대기 없이 해당 Signal을 GPU 상에서 Wait 하도록 전달
     graphicsQueue->Wait(mFence.Get(), mFenceValue);
+    mHasPendingUploads = false;
 }
 
 void UploadContext::Flush()
 {
+    if (!mCopyQueue || !mFence) return;
+
     mFenceValue++;
     if (SUCCEEDED(mCopyQueue->Signal(mFence.Get(), mFenceValue)))
     {
@@ -44,11 +76,16 @@ void UploadContext::Flush()
             mFence->SetEventOnCompletion(mFenceValue, mFenceEvent);
             WaitForSingleObject(mFenceEvent, INFINITE);
         }
+        mHasPendingUploads = false;
     }
+    ProcessCompletedReleases();
 }
 
 void UploadContext::Shutdown()
 {
+    Flush();
+    mPendingReleases.clear();
+
     mCopyQueue.Reset();
     mAllocator.Reset();
     mCommandList.Reset();

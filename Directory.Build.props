@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+
+  <!--
+    서드파티(Assimp) 경로 중앙화.
+
+    권장 설정:
+      1) vcpkg를 설치하고 VCPKG_ROOT 환경변수를 설정한다.
+      2) 프로젝트 루트에서 `vcpkg install assimp:x64-windows` 를 실행하거나,
+         Visual Studio에서 "Manage NuGet Packages" 대신 vcpkg manifest 모드를 사용한다.
+
+    다른 경로에 설치했다면 AssimpRoot / AssimpLibDebug / AssimpLibRelease 를
+    커맨드라인(/p:AssimpRoot=...) 또는 이 파일을 수정해서 재정의하면 된다.
+  -->
+  <PropertyGroup Label="ThirdParty">
+    <!--
+      기본은 classic 모드: VCPKG_ROOT\installed\x64-windows 를 사용한다.
+      manifest 모드(vcpkg.json 기반 자동 설치)를 쓰려면 /p:UseVcpkgManifest=true 를 넘긴다.
+      (vcpkg integration 이 설정되어 있어야 동작한다.)
+    -->
+    <VcpkgEnableManifest Condition="'$(UseVcpkgManifest)' == 'true'">true</VcpkgEnableManifest>
+
+    <AssimpRoot Condition="'$(AssimpRoot)' == '' and '$(VcpkgEnableManifest)' == 'true'">$(MSBuildThisFileDirectory)vcpkg_installed\x64-windows</AssimpRoot>
+    <AssimpRoot Condition="'$(AssimpRoot)' == '' and '$(VCPKG_ROOT)' != ''">$(VCPKG_ROOT)\installed\x64-windows</AssimpRoot>
+    <AssimpRoot Condition="'$(AssimpRoot)' == ''">$(MSBuildThisFileDirectory)vcpkg_installed\x64-windows</AssimpRoot>
+    <AssimpIncludeDir Condition="'$(AssimpIncludeDir)' == ''">$(AssimpRoot)\include</AssimpIncludeDir>
+    <AssimpLibraryDir Condition="'$(AssimpLibraryDir)' == ''">$(AssimpRoot)\lib</AssimpLibraryDir>
+
+    <!--
+      Assimp lib 이름은 사용하는 PlatformToolset(v143/v145/...)에 따라 달라진다.
+      GameEngine.vcxproj에서 $(PlatformToolset)을 이용해 자동 계산하며,
+      여기서 AssimpLibDebug / AssimpLibRelease를 미리 정의하면 이를 재정의한다.
+    -->
+  </PropertyGroup>
+
+</Project>

@@ -11,6 +11,9 @@
 #include <DirectXMath.h>
 #include <stdexcept>
 #include <string>
+#include <cstdio>
+#include <cstdlib>
+#include <comdef.h>
 #include <commdlg.h>
 #include <algorithm>
 #include <functional>
@@ -30,10 +33,30 @@
 
 using Microsoft::WRL::ComPtr;
 
-inline void ThrowIfFailed(HRESULT hr)
+inline void ThrowIfFailedImpl(HRESULT hr, const char* file, int line)
 {
     if (FAILED(hr))
     {
-        throw std::runtime_error("DX12 call failed");
+        _com_error comError(hr);
+        const wchar_t* wide = comError.ErrorMessage();
+        char message[512] = {};
+        size_t converted = 0;
+        if (wide)
+        {
+            wcstombs_s(&converted, message, sizeof(message), wide, sizeof(message) - 1);
+        }
+        else
+        {
+            strncpy_s(message, sizeof(message) - 1, "Unknown HRESULT", sizeof(message) - 1);
+        }
+
+        char detail[768] = {};
+        sprintf_s(detail, "DX12 call failed: hr=0x%08X (%s) at %s:%d\n",
+            static_cast<unsigned int>(hr), message, file, line);
+        OutputDebugStringA(detail);
+        throw std::runtime_error(detail);
     }
 }
+
+// 파일/라인 정보를 자동으로 포함한다.
+#define ThrowIfFailed(hr) ThrowIfFailedImpl((hr), __FILE__, __LINE__)

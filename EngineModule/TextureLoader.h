@@ -16,9 +16,10 @@ public:
 
     void Initialize(ID3D12Device* device, DescriptorAllocator* srvAllocator, UploadContext* uploadContext);
 
-    std::shared_ptr<Texture> LoadTextureFromFile(const std::wstring& path);
-    std::shared_ptr<Texture> LoadTextureFromMemory(const void* data, size_t sizeBytes);
-    std::shared_ptr<Texture> CreateTextureFromRawRGBA(const void* pixels, UINT width, UINT height);
+    // srgb=true: Base Color (UNORM_SRGB). false: Normal/Mask 등 선형 데이터.
+    std::shared_ptr<Texture> LoadTextureFromFile(const std::wstring& path, bool srgb = false);
+    std::shared_ptr<Texture> LoadTextureFromMemory(const void* data, size_t sizeBytes, bool srgb = false);
+    std::shared_ptr<Texture> CreateTextureFromRawRGBA(const void* pixels, UINT width, UINT height, bool srgb = false);
     std::shared_ptr<Texture> CreateSolidColorTexture(BYTE r, BYTE g, BYTE b, BYTE a);
 
 private:

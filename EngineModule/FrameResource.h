@@ -2,6 +2,7 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 #include <DirectXMath.h>
+#include "EngineConstants.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -24,8 +25,8 @@ struct CameraCBData
     float Pad0;
 };
 
-//CSM 캐스케이드 개수
-static constexpr UINT kNumCascades = 3;
+//CSM 캐스케이드 개수 (단일 상수 정의를 사용)
+static constexpr UINT kNumCascades = kEngineCascadeCount;
 
 struct LightCBData
 {
@@ -69,7 +70,8 @@ struct ShadowCBData
     DirectX::XMFLOAT4X4 WorldLightViewProj;
 };
 
-static constexpr UINT MAX_BONES = 96;
+// HLSL의 gBoneMatrices 배열 크기와 반드시 일치해야 한다.
+static constexpr UINT MAX_BONES = kEngineMaxBones;
 
 struct BoneCBData
 {

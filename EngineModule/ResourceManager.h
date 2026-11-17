@@ -28,9 +28,10 @@ public:
 
     //GPU 리소스 생성 및 캐싱 로더
     std::shared_ptr<Mesh> GetCubeMesh(); //const 제거로 cpp와 호환
-    std::shared_ptr<Texture> LoadTexture(const std::wstring& path);
+    std::shared_ptr<Texture> LoadTexture(const std::wstring& path, bool srgb = false);
     std::shared_ptr<Texture> GetDefaultWhiteTexture();
-    std::shared_ptr<Texture> GetOrLoadTexture(AssetHandle handle);
+    // srgb=true: Base Color 용 UNORM_SRGB 포맷으로 로드
+    std::shared_ptr<Texture> GetOrLoadTexture(AssetHandle handle, bool srgb = false);
     std::shared_ptr<Model> GetOrLoadModel(AssetHandle handle);
 
     void FlushUploads();

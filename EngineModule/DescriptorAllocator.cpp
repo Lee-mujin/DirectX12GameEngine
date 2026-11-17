@@ -47,6 +47,8 @@ DescriptorHandle DescriptorAllocator::Allocate()
         }
     }
 
+    // 힙 고갈은 조용히 실패하면 텍스처가 그리드에서 사라진다. 반드시 로그를 남긴다.
+    OutputDebugStringA("[DescriptorAllocator] Heap exhausted - Allocate() returned an invalid handle.\n");
     return handle;
 }
 

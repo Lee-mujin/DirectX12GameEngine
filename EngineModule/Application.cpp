@@ -103,7 +103,7 @@ void Application::CreateDefaultScene()
     auto material = std::make_shared<Material>();
     //AssetHandle과 함께 텍스처 바인딩
     AssetHandle boxTexHandle = mResourceManager.GetOrCreateHandle("Assets/Textures/Box.jpg");
-    material->SetBaseColorTexture(mResourceManager.GetOrLoadTexture(boxTexHandle), boxTexHandle);
+    material->SetBaseColorTexture(mResourceManager.GetOrLoadTexture(boxTexHandle, true), boxTexHandle);
     meshRenderer->SetMaterial(material);
 
     //GPU동기화
@@ -177,6 +177,10 @@ std::shared_ptr<GameObject> Application::SpawnAssetIntoScene(AssetHandle handle)
     }
 
     scene->AddGameObject(obj);
+
+    // 모델/텍스처 업로드는 전용 Copy Queue에서 비동기로 제출된다.
+    // 첫 프레임에서 Graphics Queue가 덜 복사된 버퍼를 읽지 않도록 완료를 기다린다.
+    mUploadContext.SyncWithGraphicsQueue(mRenderer.GetCommandQueue());
     return obj;
 }
 
@@ -184,6 +188,13 @@ void Application::Run()
 {
     while (mWindow.ProcessMessage())
     {
+        // 창 크기가 바뀌면 스왑체인/백버퍼/깊이 버퍼를 재생성한다(백버퍼 늘어남 방지).
+        if (mWindow.IsResizePending())
+        {
+            mWindow.ConsumeResize();
+            mRenderer.ResizeSwapChain(mWindow.GetWidth(), mWindow.GetHeight());
+        }
+
         mTimer.Tick();
         float deltaTime = mTimer.DeltaTime();
 
@@ -307,6 +318,12 @@ void Application::Run()
             mViewportWidth = static_cast<float>(uNewWidth);
             mViewportHeight = static_cast<float>(uNewHeight);
             mRenderer.ResizeViewport(uNewWidth, uNewHeight);
+
+            // 뷰포트 패널 종횡비가 바뀌면 카메라 투영도 함께 갱신한다.
+            if (mainCam)
+            {
+                mainCam->SetAspect(static_cast<float>(uNewWidth) / static_cast<float>(uNewHeight));
+            }
         }
         mViewportPosX = posX;
         mViewportPosY = posY;
@@ -322,11 +339,16 @@ void Application::Run()
 
         mSceneManager.Update(&mInput, deltaTime);
 
+        UINT culledObjects = 0;
+
         if (scene && scene->GetMainCamera())
         {
-            //RenderQueue
+            // Inspector 텍스처 드롭 등에서 발생한 업로드를 이번 프레임 렌더 전에 한 번 정리한다.
+            mUploadContext.SyncWithGraphicsQueue(mRenderer.GetCommandQueue());
+
+            //RenderQueue (메인 카메라 프러스텀으로 컬링)
             RenderQueue queue;
-            scene->BuildRenderQueue(queue);
+            scene->BuildRenderQueue(queue, &scene->GetMainCamera()->GetCamera(), &culledObjects);
 
             //패스 실행용 Context 구성
             RenderContext context;
@@ -348,6 +370,14 @@ void Application::Run()
             UIPass uiPass;
             uiPass.Execute(context);
         }
+
+        if (ImGui::Begin("Render Stats"))
+        {
+            ImGui::Text("Draw calls (submeshes): %u", mRenderer.GetLastDrawCount());
+            ImGui::Text("Culled objects: %u", culledObjects);
+            ImGui::Text("Frame time: %.2f ms", deltaTime * 1000.0f);
+        }
+        ImGui::End();
 
         mInput.Update();
     }

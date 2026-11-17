@@ -3,7 +3,10 @@ cbuffer ShadowCB : register(b0)
     matrix gWorldLightViewProj;
 };
 
+// C++에서 -D 매크로로 주입한다(kEngineMaxBones). 단독 컴파일용 폴백.
+#ifndef MAX_BONES
 #define MAX_BONES 96
+#endif
 cbuffer BoneCB : register(b1)
 {
     matrix gBoneMatrices[MAX_BONES];

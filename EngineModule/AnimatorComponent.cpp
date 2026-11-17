@@ -26,6 +26,8 @@ void AnimatorComponent::SetAnimationList(std::vector<std::shared_ptr<Animation>>
     if (!mAnimationList.empty())
     {
         SetAnimationByIndex(0);
+        // 스켈레톤 모델을 로드하면 첫 클립이 바로 재생되도록 한다.
+        mIsPlaying = true;
     }
 }
 

@@ -1,6 +1,15 @@
 #include "pch.h"
 #include "D3D12Renderer.h"
 
+namespace
+{
+#ifdef _DEBUG
+    constexpr bool kDebugBuild = true;
+#else
+    constexpr bool kDebugBuild = false;
+#endif
+}
+
 bool D3D12Renderer::Initialize(HWND hwnd, UINT width, UINT height)
 {
     mHwnd = hwnd;
@@ -52,9 +61,9 @@ void D3D12Renderer::InitializeRenderTargets()
     InitializeShadowMap();
 
     SetupViewport();
-    InitializeViewport(1280, 720);
-    InitializeHDRRenderTarget(1280, 720);
-    InitializeBloomRenderTargets(1280, 720);
+    InitializeViewport(mWidth, mHeight);
+    InitializeHDRRenderTarget(mWidth, mHeight);
+    InitializeBloomRenderTargets(mWidth, mHeight);
 }
 
 //파이프라인(셰이더, 루트시그니처, PSO) 구축
@@ -83,7 +92,7 @@ void D3D12Renderer::CreateFactory()
         debugController->EnableDebugLayer();
     }
 #endif
-    ThrowIfFailed(CreateDXGIFactory2(_DEBUG ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(&mFactory)));
+    ThrowIfFailed(CreateDXGIFactory2(kDebugBuild ? DXGI_CREATE_FACTORY_DEBUG : 0, IID_PPV_ARGS(&mFactory)));
 }
 
 void D3D12Renderer::CreateDevice()
@@ -174,9 +183,42 @@ void D3D12Renderer::CreateDepthStencil()
     dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
     dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
-    //DSV 할당자의 Start 위치에 메인 DepthStencilView 생성
-    DescriptorHandle mainDsvHandle = mDsvAllocator.Allocate();
-    mDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, mainDsvHandle.CpuHandle);
+    //메인 DepthStencilView는 한 번만 할당하고 리사이즈 시에도 같은 슬롯을 재사용한다.
+    if (!mMainDsvHandle.IsValid())
+    {
+        mMainDsvHandle = mDsvAllocator.Allocate();
+    }
+    mDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, mMainDsvHandle.CpuHandle);
+}
+
+void D3D12Renderer::RecreateDepthStencil()
+{
+    // 리사이즈 시 기존 깊이 버퍼를 해제하고 창 크기로 다시 만든 뒤
+    // HDR 패스가 참조하는 메인 DSV 슬롯을 새 리소스로 갱신한다.
+    mDepthStencilBuffer.Reset();
+
+    D3D12_RESOURCE_DESC depthDesc = {};
+    depthDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    depthDesc.Width = mWidth;
+    depthDesc.Height = mHeight;
+    depthDesc.DepthOrArraySize = 1;
+    depthDesc.MipLevels = 1;
+    depthDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    depthDesc.SampleDesc.Count = 1;
+    depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    D3D12_CLEAR_VALUE clearValue = {};
+    clearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    clearValue.DepthStencil.Depth = 1.0f;
+
+    CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
+    ThrowIfFailed(mDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &depthDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearValue, IID_PPV_ARGS(&mDepthStencilBuffer)));
+
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+    dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    mDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, mMainDsvHandle.CpuHandle);
 }
 
 void D3D12Renderer::SetupViewport()
@@ -187,10 +229,21 @@ void D3D12Renderer::SetupViewport()
 
 void D3D12Renderer::CompileShaderInternal(const std::wstring& filename, const char* entryPoint, const char* target, ID3DBlob** shaderBlob)
 {
-    UINT compileFlags = _DEBUG ? (D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION) : 0;
+    // C++ 상수와 HLSL 매크로가 어긋나지 않도록 컴파일 타임에 검증한다.
+    static_assert(kEngineMaxBones == 96, "HLSL MAX_BONES define must be updated together with kEngineMaxBones.");
+    static_assert(kEngineCascadeCount == 3, "HLSL CASCADE_COUNT define must be updated together with kEngineCascadeCount.");
+
+    D3D_SHADER_MACRO defines[] =
+    {
+        { "MAX_BONES", "96" },
+        { "CASCADE_COUNT", "3" },
+        { nullptr, nullptr }
+    };
+
+    UINT compileFlags = kDebugBuild ? (D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION) : 0;
     ComPtr<ID3DBlob> errorBlob;
 
-    HRESULT hr = D3DCompileFromFile(filename.c_str(), nullptr, nullptr, entryPoint, target, compileFlags, 0, shaderBlob, &errorBlob);
+    HRESULT hr = D3DCompileFromFile(filename.c_str(), defines, nullptr, entryPoint, target, compileFlags, 0, shaderBlob, &errorBlob);
     if (FAILED(hr) && errorBlob) OutputDebugStringA((char*)errorBlob->GetBufferPointer());
     ThrowIfFailed(hr);
 }
@@ -231,6 +284,9 @@ void D3D12Renderer::CreateRootSignature()
     samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     samplers[0].AddressU = samplers[0].AddressV = samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    // {} 초기화면 MaxLOD=0이 되어 밉맵 도입 시 전부 불려온다.
+    samplers[0].MinLOD = 0.0f;
+    samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
     samplers[0].ShaderRegister = 0;
     samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
@@ -239,6 +295,8 @@ void D3D12Renderer::CreateRootSignature()
     samplers[1].AddressU = samplers[1].AddressV = samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
     samplers[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE; //영역 밖은 그림자 안 생김
     samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    samplers[1].MinLOD = 0.0f;
+    samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
     samplers[1].ShaderRegister = 1;
     samplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 

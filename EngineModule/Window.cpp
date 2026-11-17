@@ -96,6 +96,22 @@ LRESULT CALLBACK Window::WndProc(HWND hWnd, UINT32 msg, WPARAM wParam, LPARAM lP
         DestroyWindow(hWnd);
         return 0;
 
+    case WM_SIZE:
+        if (window && wParam != SIZE_MINIMIZED)
+        {
+            UINT clientWidth = LOWORD(lParam);
+            UINT clientHeight = HIWORD(lParam);
+            if (clientWidth > 0 && clientHeight > 0 &&
+                (clientWidth != static_cast<UINT>(window->mWidth) ||
+                 clientHeight != static_cast<UINT>(window->mHeight)))
+            {
+                window->mWidth = static_cast<int>(clientWidth);
+                window->mHeight = static_cast<int>(clientHeight);
+                window->mResizePending = true;
+            }
+        }
+        return 0;
+
     case WM_DESTROY:
         PostQuitMessage(0);
         break;

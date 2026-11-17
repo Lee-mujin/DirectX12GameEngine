@@ -3,6 +3,7 @@
 
 class Scene;
 class Application;
+class ResourceManager;
 
 class SceneSerializer
 {

@@ -6,8 +6,10 @@
 #include "Camera.h"
 #include "DirectionalLight.h"
 #include "MathUtil.h"
+#include "EngineConstants.h"
 
-static constexpr UINT kCascadeCount = 3;
+// 단일 상수 정의 사용 (D3D12Renderer / FrameResource / ShadowMap 과 동일)
+static constexpr UINT kCascadeCount = kEngineCascadeCount;
 
 struct CascadeData
 {
@@ -19,10 +21,20 @@ struct CascadeData
 class CSMCalculator
 {
 public:
+    // 광원 방향이 Up과 평행하면 LookAt의 cross product가 0이 되어 NaN 행렬이 나온다.
+    // 수직 광원(아래/위로 바로 내리쬐는 경우)에는 Forward를 Up으로 대체한다.
+    static Vector3 GetLightUp(const DirectionalLight& light)
+    {
+        Vector3 dir = light.Direction.GetNormalize();
+        return (fabsf(Vector3::Dot(dir, Vector3::Up)) > 0.99f)
+            ? Vector3::Forward
+            : Vector3::Up;
+    }
+
     static Matrix4x4 GetLightView(const DirectionalLight& light, const Vector3& sceneCenter)
     {
         Vector3 lightPos = sceneCenter - light.Direction.GetNormalize() * 20.0f;
-        return Matrix4x4::LookAt(lightPos, sceneCenter, Vector3::Up);
+        return Matrix4x4::LookAt(lightPos, sceneCenter, GetLightUp(light));
     }
 
     static Matrix4x4 GetLightProjection(float orthoSize = 20.0f, float nearZ = 0.1f, float farZ = 50.0f)
@@ -121,7 +133,7 @@ public:
             float radius = (splitDist - prevSplitDist) * 0.7071f + (splitDist * 0.15f);
 
             Vector3 lightPos = center - light.Direction.GetNormalize() * (radius * 2.0f);
-            Matrix4x4 lightView = Matrix4x4::LookAt(lightPos, center, Vector3::Up);
+            Matrix4x4 lightView = Matrix4x4::LookAt(lightPos, center, GetLightUp(light));
 
             Matrix4x4 lightProj = Matrix4x4::Ortho(radius * 2.0f, radius * 2.0f, 0.1f, radius * 4.0f);
 
